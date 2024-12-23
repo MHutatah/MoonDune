@@ -3,14 +3,11 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 
-namespace Systems.UISystems
+namespace Core.Managers
+{
+    public class UIManager : MonoBehaviour
     {
-    /// <summary>
-    /// Manages the Heads-Up Display (HUD), updating UI elements based on game state.
-    /// </summary>
-    public class HUDController : MonoBehaviour
-    {
-        #region Inspector Variables
+        public static UIManager Instance;
 
         [Header("Gravity Fuel UI")]
         [SerializeField] private Slider gravityFuelSlider;           // Slider representing gravity fuel
@@ -48,26 +45,27 @@ namespace Systems.UISystems
         [Header("Vehicle HUD UI")]
         [SerializeField] private GameObject vehicleHUD;              // Reference to the Vehicle HUD UI GameObject
 
-        #endregion
-
-        #region Private Variables
-
         private Coroutine pickupMessageCoroutine;
         private Coroutine interactionPromptCoroutine;
 
-        #endregion
-
-        #region Unity Callbacks
-
         private void Awake()
         {
+            // Implement Singleton pattern
+            if (Instance == null)
+            {
+                Instance = this;
+                // Optionally persist across scenes
+                // DontDestroyOnLoad(gameObject);
+            }
+            else
+            {
+                Destroy(gameObject);
+                return;
+            }
+
             // Initialize UI elements
             InitializeUIElements();
         }
-
-        #endregion
-
-        #region UI Initialization
 
         /// <summary>
         /// Initializes all UI elements to their default states.
@@ -91,7 +89,7 @@ namespace Systems.UISystems
             // Initialize Vehicle Laser Slider
             if (vehicleLaserSlider != null)
             {
-                vehicleLaserSlider.maxValue = 150f; // Default max value, to be updated by script
+                vehicleLaserSlider.maxValue = 100f; // Default max value, to be updated by script
                 vehicleLaserSlider.value = vehicleLaserSlider.maxValue;
             }
 
@@ -102,7 +100,7 @@ namespace Systems.UISystems
                 oxygenSlider.value = oxygenSlider.maxValue;
             }
 
-            // Initialize Oxygen Warning Message
+            // Initialize Insufficient Fuel Message
             if (oxygenWarningMessage != null)
             {
                 oxygenWarningMessage.SetActive(false);
@@ -143,10 +141,6 @@ namespace Systems.UISystems
                 vehicleHUD.SetActive(false); // Ensure HUD is inactive at start
             }
         }
-
-        #endregion
-
-        #region UI Update Methods
 
         /// <summary>
         /// Updates the gravity fuel bar on the UI.
@@ -370,7 +364,5 @@ namespace Systems.UISystems
                 vehicleHUD.SetActive(false);
             }
         }
-
-        #endregion
     }
 }

@@ -1,230 +1,248 @@
 using UnityEngine;
+using Core.Managers;
+using Systems.EnvironmentSystems;
 
-public class PlayerLaser : MonoBehaviour
+namespace Systems.PlayerSystems
 {
-    [Header("Laser Settings")]
-    public float laserRange = 10f;                // Max range
-    public float laserDamagePerSecond = 10f;      // Damage per second
-    public float drainRate = 5f;                  // Energy drained per second
-    public float rechargeRate = 3f;               // Energy replenished per second
-    public float maxLaserEnergy = 100f;           // Max laser energy
-    public float overheatDuration = 5f;           // Overheat time in seconds
-
-    [Header("Laser Growth Settings")]
-    public float growthRate = 20f;                // Units/sec growth
-    private float currentLaserRange = 0f;
-
-    [Header("Internal State")]
-    private float currentLaserEnergy;
-    private bool isOverheating = false;
-    private float overheatTimer = 0f;
-    private bool isFiring = false;
-    private bool isRetracting = false;
-
-    // We only lock direction AFTER we stop firing
-    private Vector3 lockedDirection = Vector3.forward;
-
-    [Header("Laser Visuals")]
-    public LineRenderer laserBeam;
-    public Transform firePoint;
-
-    void Start()
+    /// <summary>
+    /// Handles the player's laser firing mechanics, including energy management and overheating.
+    /// </summary>
+    public class PlayerLaser : MonoBehaviour
     {
-        currentLaserEnergy = maxLaserEnergy;
-        currentLaserRange = 0f;
-        isRetracting = false;
+        #region Inspector Variables
 
-        if (laserBeam)
-        {
-            laserBeam.positionCount = 2;
-            laserBeam.enabled = false;
-        }
-    }
+        [Header("Laser Settings")]
+        [SerializeField] private float laserRange = 10f;               // Maximum range of the laser
+        [SerializeField] private float laserDamagePerSecond = 10f;     // Damage dealt per second to crystals
+        [SerializeField] private float drainRate = 5f;                 // Energy drained per second while firing
+        [SerializeField] private float rechargeRate = 3f;              // Energy replenished per second when not firing
+        [SerializeField] private float maxLaserEnergy = 100f;          // Maximum laser energy capacity
+        [SerializeField] private float overheatDuration = 5f;          // Duration (in seconds) laser is disabled after overheating
 
-    void Update()
-    {
-        if (isOverheating)
+        [Header("Laser Growth Settings")]
+        [SerializeField] private float growthRate = 20f;               // Units per second the laser grows
+
+        [Header("Laser Visuals")]
+        [SerializeField] private LineRenderer laserBeam;               // Reference to the Line Renderer component
+        [SerializeField] private Transform firePoint;                  // The origin point of the laser
+
+        #endregion
+
+        #region Private Variables
+
+        private float currentLaserRange = 0f;                         // Current dynamic range of the laser
+        private float currentLaserEnergy;                             // Current laser energy
+        private bool isOverheating = false;                           // Indicates if the laser is in overheating state
+        private float overheatTimer = 0f;                             // Timer for overheating duration
+        private bool isFiring = false;                                // Indicates if the player is currently firing
+
+        #endregion
+
+        #region Unity Callbacks
+
+        private void Start()
         {
-            HandleOverheat();
-            return;
+            InitializeLaser();
         }
 
-        // Check if the user is pressing Fire1 and if we have energy
-        bool canFire = Input.GetButton("Fire1") && currentLaserEnergy > 0f;
-
-        if (canFire)
+        private void Update()
         {
-            // If we were retracting, stop and reset
-            if (isRetracting)
+            if (isOverheating)
             {
-                isRetracting = false;
-                currentLaserRange = Mathf.Clamp(currentLaserRange, 0f, laserRange);
+                HandleOverheat();
+                return;
             }
 
-            // Laser direction should follow the real-time forward
-            Vector3 liveDirection = firePoint.forward;
+            HandleFiring();
 
-            GrowLaser();
-            FireLaserBeam(liveDirection);
-        }
-        else
-        {
-            // If we were previously firing, we now lock the direction for retraction
-            if (isFiring && !isRetracting)
+            if (!isFiring)
             {
-                isRetracting = true;
-                // Store the LAST real-time direction we had
-                lockedDirection = firePoint.forward;
+                RechargeLaser();
             }
 
-            RetractLaser();
+            CheckOverheatCondition();
         }
 
-        // Overheat check
-        if (currentLaserEnergy <= 0f && !isOverheating)
+        #endregion
+
+        #region Initialization
+
+        /// <summary>
+        /// Initializes laser properties and visuals.
+        /// </summary>
+        private void InitializeLaser()
         {
-            StartOverheat();
-        }
+            currentLaserEnergy = maxLaserEnergy;
+            currentLaserRange = 0f;
 
-        isFiring = canFire; // Remember our firing state for next frame
-    }
-
-    private void GrowLaser()
-    {
-        // Drain energy
-        currentLaserEnergy -= drainRate * Time.deltaTime;
-        currentLaserEnergy = Mathf.Clamp(currentLaserEnergy, 0f, maxLaserEnergy);
-
-        // Grow laser range
-        currentLaserRange += growthRate * Time.deltaTime;
-        currentLaserRange = Mathf.Clamp(currentLaserRange, 0f, laserRange);
-
-        // Update UI
-        UIManager.Instance.UpdateLaserBar(currentLaserEnergy, maxLaserEnergy);
-    }
-
-    private void FireLaserBeam(Vector3 currentDirection)
-    {
-        if (!laserBeam || !firePoint) return;
-
-        if (!laserBeam.enabled)
-            laserBeam.enabled = true;
-
-        Vector3 startPos = firePoint.position;
-        Vector3 endPos = startPos + currentDirection * currentLaserRange;
-
-        // Raycast
-        Ray ray = new Ray(startPos, currentDirection);
-        if (Physics.Raycast(ray, out RaycastHit hit, currentLaserRange))
-        {
-            endPos = hit.point;
-            // If it's a crystal, apply damage
-            LunarCrystal crystal = hit.collider.GetComponent<LunarCrystal>();
-            if (crystal)
+            if (laserBeam != null)
             {
-                crystal.TakeDamage(laserDamagePerSecond * Time.deltaTime);
+                laserBeam.positionCount = 2;
+                laserBeam.enabled = false;
+            }
+            else
+            {
+                Debug.LogWarning("PlayerLaser: LaserBeam is not assigned in the Inspector.");
             }
         }
 
-        laserBeam.SetPosition(0, startPos);
-        laserBeam.SetPosition(1, endPos);
-    }
+        #endregion
 
-    private void RetractLaser()
-    {
-        if (!isRetracting)
+        #region Firing Logic
+
+        /// <summary>
+        /// Handles the firing logic based on player input.
+        /// </summary>
+        private void HandleFiring()
         {
-            // If we are not in retraction mode, just update energy passively
+            bool canFire = Input.GetButton("Fire1") && currentLaserEnergy > 0f;
+
+            if (canFire)
+            {
+                isFiring = true;
+                GrowLaser();
+                FireLaserBeam(firePoint.forward);
+            }
+            else
+            {
+                isFiring = false;
+                StopFiring();
+            }
+        }
+
+        /// <summary>
+        /// Increases the laser's range and drains energy accordingly.
+        /// </summary>
+        private void GrowLaser()
+        {
+            // Drain energy
+            currentLaserEnergy -= drainRate * Time.deltaTime;
+            currentLaserEnergy = Mathf.Clamp(currentLaserEnergy, 0f, maxLaserEnergy);
+
+            // Grow laser range
+            currentLaserRange += growthRate * Time.deltaTime;
+            currentLaserRange = Mathf.Clamp(currentLaserRange, 0f, laserRange);
+
+            // Update UI
+            UIManager.Instance?.UpdatePlayerLaserBar(currentLaserEnergy, maxLaserEnergy);
+        }
+
+        /// <summary>
+        /// Renders the laser beam in the current firing direction.
+        /// </summary>
+        /// <param name="currentDirection">The current direction of the laser.</param>
+        private void FireLaserBeam(Vector3 currentDirection)
+        {
+            if (laserBeam == null || firePoint == null) return;
+
+            if (!laserBeam.enabled)
+                laserBeam.enabled = true;
+
+            Vector3 startPos = firePoint.position;
+            Vector3 endPos = startPos + currentDirection * currentLaserRange;
+
+            // Raycast to detect hit
+            Ray ray = new Ray(startPos, currentDirection);
+            if (Physics.Raycast(ray, out RaycastHit hit, currentLaserRange))
+            {
+                endPos = hit.point;
+
+                // Apply damage to the hit crystal
+                LunarCrystal crystal = hit.collider.GetComponent<LunarCrystal>();
+                if (crystal != null)
+                {
+                    crystal.TakeDamage(laserDamagePerSecond * Time.deltaTime, transform);
+                }
+            }
+
+            // Update Line Renderer positions
+            laserBeam.SetPosition(0, startPos);
+            laserBeam.SetPosition(1, endPos);
+        }
+
+        /// <summary>
+        /// Stops firing by disabling the laser beam and resetting its range.
+        /// </summary>
+        private void StopFiring()
+        {
+            if (laserBeam != null && laserBeam.enabled)
+                laserBeam.enabled = false;
+
+            currentLaserRange = 0f;
+        }
+
+        #endregion
+
+        #region Energy Management
+
+        /// <summary>
+        /// Recharges the laser's energy when not firing.
+        /// </summary>
+        private void RechargeLaser()
+        {
             if (currentLaserEnergy < maxLaserEnergy)
             {
                 currentLaserEnergy += rechargeRate * Time.deltaTime;
                 currentLaserEnergy = Mathf.Clamp(currentLaserEnergy, 0f, maxLaserEnergy);
-                UIManager.Instance.UpdateLaserBar(currentLaserEnergy, maxLaserEnergy);
+                UIManager.Instance?.UpdatePlayerLaserBar(currentLaserEnergy, maxLaserEnergy);
             }
-
-            // If the beam was on but range is not zero, we might keep it?
-            // Or you can force-laserBeam.enabled = false when not firing
-            if (currentLaserRange <= 0f && laserBeam.enabled)
-                laserBeam.enabled = false;
-
-            return; 
         }
 
-        // We are in retraction mode
-        if (currentLaserRange > 0f)
+        #endregion
+
+        #region Overheat Handling
+
+        /// <summary>
+        /// Checks if the laser should enter the overheating state.
+        /// </summary>
+        private void CheckOverheatCondition()
         {
-            float retractSpeed = growthRate * 3f;
-            currentLaserRange -= retractSpeed * Time.deltaTime;
-            currentLaserRange = Mathf.Max(0f, currentLaserRange);
-            UpdateRetractionVisual();
+            if (currentLaserEnergy <= 0f && !isOverheating)
+            {
+                StartOverheat();
+            }
         }
-        else
+
+        /// <summary>
+        /// Initiates the overheating state.
+        /// </summary>
+        private void StartOverheat()
         {
-            // fully retracted
-            if (laserBeam && laserBeam.enabled)
-                laserBeam.enabled = false;
+            isOverheating = true;
+            overheatTimer = overheatDuration;
+            Debug.Log("Player Laser is overheating!");
 
-            isRetracting = false;
+            StopFiring();
         }
 
-        // Passive recharge
-        if (currentLaserEnergy < maxLaserEnergy)
+        /// <summary>
+        /// Manages the overheating timer and resets the laser once cooldown is complete.
+        /// </summary>
+        private void HandleOverheat()
         {
-            currentLaserEnergy += rechargeRate * Time.deltaTime;
-            currentLaserEnergy = Mathf.Clamp(currentLaserEnergy, 0f, maxLaserEnergy);
-            UIManager.Instance.UpdateLaserBar(currentLaserEnergy, maxLaserEnergy);
+            overheatTimer -= Time.deltaTime;
+            if (overheatTimer <= 0f)
+            {
+                isOverheating = false;
+                Debug.Log("Player Laser is ready again.");
+            }
         }
-    }
 
-    private void UpdateRetractionVisual()
-    {
-        if (!laserBeam || !firePoint) return;
-        if (!laserBeam.enabled)
-            laserBeam.enabled = true;
+        #endregion
 
-        // Use the locked direction for retraction
-        Vector3 startPos = firePoint.position;
-        Vector3 endPos = startPos + lockedDirection * currentLaserRange;
+        #region Public Methods
 
-        Ray ray = new Ray(startPos, lockedDirection);
-        if (Physics.Raycast(ray, out RaycastHit hit, currentLaserRange))
+        /// <summary>
+        /// Replenishes the laser's energy. Can be called externally.
+        /// </summary>
+        /// <param name="amount">Amount of energy to add.</param>
+        public void ReplenishLaserEnergy(float amount)
         {
-            endPos = hit.point;
+            currentLaserEnergy = Mathf.Min(currentLaserEnergy + amount, maxLaserEnergy);
+            UIManager.Instance?.UpdatePlayerLaserBar(currentLaserEnergy, maxLaserEnergy);
+            Debug.Log($"Player Laser Energy Replenished by: {amount}");
         }
-        Debug.Log("Retracting!");
-        laserBeam.SetPosition(0, startPos);
-        laserBeam.SetPosition(1, endPos);
-    }
 
-    private void StartOverheat()
-    {
-        isOverheating = true;
-        overheatTimer = overheatDuration;
-        Debug.Log("Player Laser is overheating!");
-
-        // Disable beam immediately
-        if (laserBeam && laserBeam.enabled)
-            laserBeam.enabled = false;
-
-        // Force range to zero
-        currentLaserRange = 0f;
-        isRetracting = false;
-    }
-
-    private void HandleOverheat()
-    {
-        overheatTimer -= Time.deltaTime;
-        if (overheatTimer <= 0f)
-        {
-            isOverheating = false;
-            Debug.Log("Player Laser is ready again.");
-        }
-    }
-
-    public void ReplenishLaserEnergy(float amount)
-    {
-        currentLaserEnergy = Mathf.Min(currentLaserEnergy + amount, maxLaserEnergy);
-        UIManager.Instance.UpdateLaserBar(currentLaserEnergy, maxLaserEnergy);
-        Debug.Log("Laser Energy Replenished by: " + amount);
+        #endregion
     }
 }
