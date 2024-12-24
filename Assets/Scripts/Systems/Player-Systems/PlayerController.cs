@@ -1,127 +1,63 @@
 using UnityEngine;
-using Core.Interfaces;
 
-namespace PlayerSystems
+[RequireComponent(typeof(CharacterController))]
+public class PlayerController : MonoBehaviour
 {
-    /// <summary>
-    /// Controls the player's movement and rotation using a CharacterController.
-    /// </summary>
-    [RequireComponent(typeof(CharacterController))]
-    public class PlayerController : MonoBehaviour, IMovable
+    [Header("Movement Settings")]
+    [Tooltip("Movement speed when moving forward/backward.")]
+    public float moveSpeed = 3f;
+    
+    [Tooltip("Rotation speed in degrees per second.")]
+    public float turnSpeed = 90f;
+    
+    [Tooltip("Jump force upward.")]
+    public float jumpForce = 5f;
+    
+    [Tooltip("Effective gravity on the Moon (m/s^2).")]
+    public float gravity = 1.62f;
+    
+    private CharacterController charController;
+    private Vector3 moveDirection;
+
+    void Start()
     {
-        #region Inspector Variables
+        charController = GetComponent<CharacterController>();
+    }
 
-        [Header("Movement Settings")]
-        [Tooltip("Movement speed when moving forward/backward.")]
-        [SerializeField] private float moveSpeed = 3f;
-        
-        [Tooltip("Rotation speed in degrees per second.")]
-        [SerializeField] private float turnSpeed = 90f;
-        
-        [Tooltip("Jump force upward.")]
-        [SerializeField] private float jumpForce = 5f;
-        
-        [Tooltip("Effective gravity on the Moon (m/s^2).")]
-        [SerializeField] private float gravity = 1.62f;
-        
-        #endregion
+    void Update()
+    {
+        // Get input
+        float h = Input.GetAxis("Horizontal");  // used for turning
+        float v = Input.GetAxis("Vertical");    // used for forward/backward movement
 
-        #region Private Variables
+        // Rotate the player left/right based on horizontal input
+        transform.Rotate(0f, h * turnSpeed * Time.deltaTime, 0f);
 
-        private CharacterController charController;
-        private Vector3 moveDirection;
+        // Determine forward movement in the direction the player is facing
+        Vector3 forward = transform.forward * v * moveSpeed;
 
-        #endregion
-
-        #region Unity Callbacks
-
-        private void Start()
+        // If we're on the ground, set horizontal movement + handle jumping
+        if (charController.isGrounded)
         {
-            charController = GetComponent<CharacterController>();
-            if (charController == null)
+            moveDirection = forward;
+            if (Input.GetButtonDown("Jump"))
             {
-                Debug.LogError("PlayerController: No CharacterController found.");
+                moveDirection.y = jumpForce;
             }
         }
-
-        private void Update()
+        else
         {
-            HandleRotation();
-            HandleMovement();
+            // Retain current horizontal movement in the air
+            moveDirection.x = forward.x;
+            moveDirection.z = forward.z;
         }
 
-        #endregion
+        // Apply Moon gravity over time
+        moveDirection.y -= gravity * Time.deltaTime;
 
-        #region IMovable Implementation
-
-        /// <summary>
-        /// Moves the player in the specified direction.
-        /// </summary>
-        /// <param name="direction">Direction to move.</param>
-        public void Move(Vector3 direction)
-        {
-            if (charController == null) return;
-
-            float verticalInput = direction.z; // Assuming forward/backward movement
-            Vector3 forwardMovement = transform.forward * verticalInput * moveSpeed;
-
-            if (charController.isGrounded)
-            {
-                moveDirection = forwardMovement;
-                if (Input.GetButtonDown("Jump"))
-                {
-                    moveDirection.y = jumpForce;
-                }
-                else
-                {
-                    moveDirection.y = 0f;
-                }
-            }
-            else
-            {
-                // Retain current horizontal movement in the air
-                moveDirection.x = forwardMovement.x;
-                moveDirection.z = forwardMovement.z;
-            }
-
-            // Apply Moon gravity over time
-            moveDirection.y -= gravity * Time.deltaTime;
-
-            // Move the character
-            charController.Move(moveDirection * Time.deltaTime);
-        }
-
-        /// <summary>
-        /// Rotates the player around the Y-axis.
-        /// </summary>
-        /// <param name="angle">Angle in degrees to rotate.</param>
-        public void Rotate(float angle)
-        {
-            transform.Rotate(0f, angle * Time.deltaTime, 0f);
-        }
-
-        #endregion
-
-        #region Additional Movement Handling
-
-        /// <summary>
-        /// Handles player input for rotation.
-        /// </summary>
-        private void HandleRotation()
-        {
-            float horizontalInput = Input.GetAxis("Horizontal");  // A/D or Left/Right arrows
-            Rotate(horizontalInput * turnSpeed);
-        }
-
-        /// <summary>
-        /// Handles player input for movement.
-        /// </summary>
-        private void HandleMovement()
-        {
-            float verticalInput = Input.GetAxis("Vertical");    // W/S or Up/Down arrows
-            Move(new Vector3(0f, 0f, verticalInput));
-        }
-
-        #endregion
+        // Move the character
+        charController.Move(moveDirection * Time.deltaTime);
     }
 }
+
+
