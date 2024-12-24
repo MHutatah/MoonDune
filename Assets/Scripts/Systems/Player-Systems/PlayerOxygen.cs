@@ -1,25 +1,30 @@
-using Core.Managers;
 using UnityEngine;
+using Core.Managers;
+using Systems.UISystems;
 
 namespace Systems.PlayerSystems
 {
     /// <summary>
-    /// Manages the player's oxygen levels, handling depletion and replenishment.
+    /// Manages the player's oxygen levels, including depletion and replenishment.
     /// </summary>
     public class PlayerOxygen : MonoBehaviour
     {
         #region Inspector Variables
 
         [Header("Oxygen Settings")]
-        [SerializeField] private float maxOxygen = 100f;
-        [SerializeField] private float depletionRate = 1f; // Oxygen lost per second
+        public float maxOxygen = 100f;
+        [Range(0f, 100f)]
+        public float currentOxygen;
+        public float depletionRate = 1f; // Oxygen lost per second
+
+        [Header("HUD Reference")]
+        public HUDController hudController;
 
         #endregion
 
         #region Private Variables
 
-        private float currentOxygen;
-        private bool hasTriggeredLowOxygen = false;
+        private bool isOxygenLow = false;
 
         #endregion
 
@@ -28,42 +33,50 @@ namespace Systems.PlayerSystems
         private void Start()
         {
             currentOxygen = maxOxygen;
-            UIManager.Instance?.UpdateOxygenBar(currentOxygen, maxOxygen);
+            UpdateHUD();
         }
 
         private void Update()
         {
-            HandleOxygenDepletion();
+            DepleteOxygen();
         }
 
         #endregion
 
-        #region Oxygen Management
+        #region Private Methods
 
         /// <summary>
-        /// Handles oxygen depletion over time and triggers game over when oxygen is depleted.
+        /// Depletes the player's oxygen over time.
         /// </summary>
-        private void HandleOxygenDepletion()
+        private void DepleteOxygen()
         {
-            // Deplete oxygen over time
             currentOxygen -= depletionRate * Time.deltaTime;
             currentOxygen = Mathf.Clamp(currentOxygen, 0f, maxOxygen);
+            UpdateHUD();
 
-            // Update the Oxygen bar in the HUD
-            UIManager.Instance?.UpdateOxygenBar(currentOxygen, maxOxygen);
-
-            // Check for low oxygen
-            if (currentOxygen <= maxOxygen * 0.2f && !hasTriggeredLowOxygen)
+            if (currentOxygen <= 20f && !isOxygenLow)
             {
+                isOxygenLow = true;
                 UIManager.Instance?.ShowOxygenWarning();
-                EventManager.Instance?.TriggerOxygenLow();
-                hasTriggeredLowOxygen = true;
+                SoundManager.Instance?.PlayLowOxygenAlert();
             }
 
-            // Check for oxygen depletion
             if (currentOxygen <= 0f)
             {
+                // Handle game over via GameManager
                 GameManager.Instance?.GameOver();
+                Debug.Log("Player has run out of oxygen!");
+            }
+        }
+
+        /// <summary>
+        /// Updates the HUD with the current oxygen level.
+        /// </summary>
+        private void UpdateHUD()
+        {
+            if (hudController != null)
+            {
+                hudController.UpdateOxygenBar(currentOxygen, maxOxygen);
             }
         }
 
@@ -72,14 +85,20 @@ namespace Systems.PlayerSystems
         #region Public Methods
 
         /// <summary>
-        /// Replenishes oxygen.
+        /// Replenishes the player's oxygen. Can be called externally.
         /// </summary>
         /// <param name="amount">Amount of oxygen to add.</param>
         public void ReplenishOxygen(float amount)
         {
-            currentOxygen = Mathf.Min(currentOxygen + amount, maxOxygen);
-            UIManager.Instance?.UpdateOxygenBar(currentOxygen, maxOxygen);
-            hasTriggeredLowOxygen = false;
+            currentOxygen += amount;
+            currentOxygen = Mathf.Clamp(currentOxygen, 0f, maxOxygen);
+            UpdateHUD();
+
+            if (currentOxygen > 20f && isOxygenLow)
+            {
+                isOxygenLow = false;
+                // Optionally, hide oxygen warning if implemented
+            }
         }
 
         #endregion

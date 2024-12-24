@@ -1,70 +1,89 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// Manages game-wide events to facilitate communication between different systems.
-/// </summary>
 namespace Core.Managers
 {
-
+    /// <summary>
+    /// Manages game-wide events to facilitate communication between different systems.
+    /// </summary>
     public class EventManager : MonoBehaviour
     {
         public static EventManager Instance { get; private set; }
 
-        protected virtual void Awake()
+        #region Unity Callbacks
+
+        private void Awake()
         {
-            // Enhanced Singleton setup
-            if (Instance == null) 
+            // Singleton setup
+            if (Instance == null)
             {
                 Instance = this;
                 DontDestroyOnLoad(gameObject); // Persist across scenes if needed
-            } 
-            else 
+            }
+            else
             {
                 Destroy(gameObject);
             }
         }
 
+        #endregion
+
+        #region Events
+
         // Crystal Collection Event
-        public event Action<int> EventOnCrystalCollected; 
+        public event Action<int> OnCrystalCollected;
+
         public void CrystalCollected(int amount)
         {
-            EventOnCrystalCollected?.Invoke(amount);
+            OnCrystalCollected?.Invoke(amount);
         }
 
         // Oxygen Low Event
-        public event Action EventOnOxygenLow;
+        public event Action OnOxygenLow;
+
         public void TriggerOxygenLow()
         {
-            EventOnOxygenLow?.Invoke();
+            OnOxygenLow?.Invoke();
         }
 
         // Player Entered Vehicle Zone Event
-        public event Action EventOnPlayerEnteredVehicleZone;
+        public event Action OnPlayerEnteredVehicleZone;
+
         public void TriggerPlayerEnterVehicleZone()
         {
-            EventOnPlayerEnteredVehicleZone?.Invoke();
+            OnPlayerEnteredVehicleZone?.Invoke();
         }
 
         // Player Exited Vehicle Zone Event
-        public event Action EventOnPlayerExitedVehicleZone;
+        public event Action OnPlayerExitedVehicleZone;
+
         public void TriggerPlayerExitVehicleZone()
         {
-            EventOnPlayerExitedVehicleZone?.Invoke();
+            OnPlayerExitedVehicleZone?.Invoke();
         }
 
         // Player Entered Vehicle Event
-        public event Action EventOnPlayerEnteredVehicle;
+        public event Action OnPlayerEnteredVehicle;
+
         public void TriggerPlayerEnteredVehicle()
         {
-            EventOnPlayerEnteredVehicle?.Invoke();
+            OnPlayerEnteredVehicle?.Invoke();
         }
 
         // Player Exited Vehicle Event
-        public event Action EventOnPlayerExitedVehicle;
+        public event Action OnPlayerExitedVehicle;
+
         public void TriggerPlayerExitedVehicle()
         {
-            EventOnPlayerExitedVehicle?.Invoke();
+            OnPlayerExitedVehicle?.Invoke();
         }
+
+        public event Action OnCrystalDestroyed;
+
+        public void CrystalDestroyed()
+        {
+            OnCrystalDestroyed?.Invoke();
+        }
+        #endregion
     }
 }

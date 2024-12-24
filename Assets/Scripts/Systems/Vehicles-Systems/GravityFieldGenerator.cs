@@ -1,11 +1,13 @@
 using UnityEngine;
 using Core.Interfaces;
-/// <summary>
-/// Generates a gravitational field around the vehicle, affecting nearby objects.
-/// </summary>
+using Systems.VehicleSystems;
+using System.Collections.Generic;
 
 namespace Systems.VehicleSystems
 {
+    /// <summary>
+    /// Generates a gravitational field around the vehicle, affecting nearby objects.
+    /// </summary>
     [RequireComponent(typeof(SphereCollider))]
     public class GravityFieldGenerator : MonoBehaviour
     {
@@ -30,7 +32,9 @@ namespace Systems.VehicleSystems
         private VehicleController vehicleController;                    // Reference to the VehicleController script
         private SphereCollider sphereCollider;                          // SphereCollider used as a trigger for detecting nearby objects
         private GameObject gravityFieldVisualInstance;                  // Instance of the gravity field visualization
-        private Rigidbody vehicleRigidbody;                            // Rigidbody of the vehicle to exclude from gravity effects
+        private Rigidbody vehicleRigidbody;                             // Rigidbody of the vehicle to exclude from gravity effects
+
+        private List<Rigidbody> affectedRigidbodies = new List<Rigidbody>(); // List of currently affected rigidbodies
 
         #endregion
 
@@ -68,32 +72,27 @@ namespace Systems.VehicleSystems
             InitializeGravityFieldVisual();
         }
 
-        private void Update()
+        private void FixedUpdate()
         {
-            // Enable or disable the gravity field based on the VehicleController's gravity state and fuel
-            if (vehicleController != null)
+            ApplyGravityToAffectedRigidbodies();
+        }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            Rigidbody rb = other.attachedRigidbody;
+            if (rb != null && rb != vehicleRigidbody && !affectedRigidbodies.Contains(rb))
             {
-                bool shouldActivate = vehicleController.isGravityOn && vehicleController.GetCurrentGravityFuel() > 0f;
-                SetGravityFieldActive(shouldActivate);
+                affectedRigidbodies.Add(rb);
             }
         }
 
-        private void OnTriggerStay(Collider other)
+        private void OnTriggerExit(Collider other)
         {
-            if (vehicleController == null || vehicleRigidbody == null) return;
-
-            // Ignore the vehicle itself
-            if (other.attachedRigidbody == null || other.attachedRigidbody == vehicleRigidbody) return;
-
-            // Apply gravitational force towards the vehicle
-            Vector3 direction = (transform.position - other.transform.position).normalized;
-            float distance = Vector3.Distance(transform.position, other.transform.position);
-
-            // Adjust gravity strength based on distance (inverse square law)
-            float adjustedGravity = gravityStrength / Mathf.Max(distance, 1f); // Prevent division by zero
-
-            // Apply force to the other object's Rigidbody
-            other.attachedRigidbody.AddForce(direction * adjustedGravity, forceMode);
+            Rigidbody rb = other.attachedRigidbody;
+            if (rb != null && affectedRigidbodies.Contains(rb))
+            {
+                affectedRigidbodies.Remove(rb);
+            }
         }
 
         #endregion
@@ -134,6 +133,28 @@ namespace Systems.VehicleSystems
 
         #endregion
 
+        #region Gravity Application
+
+        /// <summary>
+        /// Applies gravitational force to all affected rigidbodies.
+        /// </summary>
+        private void ApplyGravityToAffectedRigidbodies()
+        {
+            foreach (Rigidbody rb in affectedRigidbodies)
+            {
+                if (rb != null)
+                {
+                    Vector3 direction = (transform.position - rb.transform.position).normalized;
+                    float distance = Vector3.Distance(transform.position, rb.transform.position);
+                    float forceMagnitude = gravityStrength / Mathf.Max(distance, 1f); // Prevent division by zero
+
+                    rb.AddForce(direction * forceMagnitude, forceMode);
+                }
+            }
+        }
+
+        #endregion
+
         #region Public Methods
 
         /// <summary>
@@ -142,14 +163,16 @@ namespace Systems.VehicleSystems
         /// <param name="active">True to activate, false to deactivate.</param>
         public void SetGravityFieldActive(bool active)
         {
-            if (sphereCollider != null)
-            {
-                sphereCollider.enabled = active;
-            }
-
+            sphereCollider.enabled = active;
             if (gravityFieldVisualInstance != null)
             {
                 gravityFieldVisualInstance.SetActive(active);
+            }
+
+            if (!active)
+            {
+                // Clear the list of affected rigidbodies when deactivating the field
+                affectedRigidbodies.Clear();
             }
         }
 

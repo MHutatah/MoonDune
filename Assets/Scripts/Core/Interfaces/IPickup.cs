@@ -8,9 +8,15 @@ namespace Core.Interfaces
     public interface IPickup
     {
         /// <summary>
-        /// Handles the pickup action when interacted with by the player.
+        /// Handles the pickup action when interacted with by another object.
         /// </summary>
-        /// <param name="other">Collider of the object interacting with the pickup.</param>
-        void OnPickup(Collider other);
+        /// <param name="collector">Collider of the object collecting the pickup.</param>
+        void OnPickup(Collider collector);
+
+        /// <summary>
+        /// Gets the amount or type of pickup this object provides.
+        /// </summary>
+        /// <returns>Pickup amount or type.</returns>
+        float GetPickupAmount();
     }
 }

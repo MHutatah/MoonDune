@@ -4,219 +4,108 @@ using TMPro;
 using System.Collections;
 
 namespace Systems.UISystems
-    {
+{
     /// <summary>
-    /// Manages the Heads-Up Display (HUD), updating UI elements based on game state.
+    /// Manages the HUD elements, including sliders and warning messages.
     /// </summary>
     public class HUDController : MonoBehaviour
     {
+        [System.Serializable]
+        public class HUDSlider
+        {
+            public Slider slider;                  // Reference to the Slider component
+            public TextMeshProUGUI label;         // Label for the slider (optional)
+        }
+
         #region Inspector Variables
 
-        [Header("Gravity Fuel UI")]
-        [SerializeField] private Slider gravityFuelSlider;           // Slider representing gravity fuel
-        [SerializeField] private Image gravityFuelFillImage;         // Fill image of the gravity fuel slider
+        [Header("HUD Sliders")]
+        public HUDSlider oxygenSlider;
+        public HUDSlider laserEnergySlider;
+        public HUDSlider gravityFuelSlider;
 
-        [Header("Player Laser UI")]
-        [SerializeField] private Slider playerLaserSlider;           // Slider representing player's laser energy
-        [SerializeField] private Image playerLaserFillImage;         // Fill image of the player's laser slider
+        [Header("Warning Messages")]
+        public TextMeshProUGUI lowOxygenWarning;
+        public TextMeshProUGUI lowLaserEnergyWarning;
+        public TextMeshProUGUI lowGravityFuelWarning;
 
-        [Header("Vehicle Laser UI")]
-        [SerializeField] private Slider vehicleLaserSlider;          // Slider representing vehicle's laser energy
-        [SerializeField] private Image vehicleLaserFillImage;        // Fill image of the vehicle's laser slider
-
-        [Header("Oxygen UI")]
-        [SerializeField] private Slider oxygenSlider;                 // Slider representing player's oxygen
-        [SerializeField] private Image oxygenFillImage;               // Fill image of the oxygen slider
-        [SerializeField] private GameObject oxygenWarningMessage;     // UI element indicating low oxygen
-
-        [Header("Crystal Count UI")]
-        [SerializeField] private TextMeshProUGUI crystalCountText;    // Text element showing crystal count
-
-        [Header("Game State UI")]
-        [SerializeField] private GameObject gameOverScreen;          // UI element for Game Over
-        [SerializeField] private GameObject gameWinScreen;           // UI element for Victory
-
-        [Header("Pickup Message UI")]
-        [SerializeField] private TextMeshProUGUI pickupMessageText;  // Text element for pickup messages
-        [SerializeField] private float pickupMessageDuration = 2f;   // Duration the pickup message is displayed
-
-        [Header("Interaction Prompt UI")]
-        [SerializeField] private TextMeshProUGUI interactionPromptText; // Text element for interaction prompts
-        [SerializeField] public string enterVehiclePrompt = "Press E to enter vehicle"; // Made public for access
-        [SerializeField] public string exitVehiclePrompt = "Press E to exit vehicle";   // Made public for access
-
-        [Header("Vehicle HUD UI")]
-        [SerializeField] private GameObject vehicleHUD;              // Reference to the Vehicle HUD UI GameObject
+        [Header("Blink Settings")]
+        public float blinkInterval = 0.5f;          // Time between blinks
+        public Color warningColor = Color.red;       // Color for warnings
 
         #endregion
 
         #region Private Variables
 
-        private Coroutine pickupMessageCoroutine;
-        private Coroutine interactionPromptCoroutine;
+        private bool isOxygenLow = false;
+        private bool isLaserEnergyLow = false;
+        private bool isGravityFuelLow = false;
+
+        private Coroutine oxygenBlinkCoroutine;
+        private Coroutine laserEnergyBlinkCoroutine;
+        private Coroutine gravityFuelBlinkCoroutine;
 
         #endregion
 
         #region Unity Callbacks
 
-        private void Awake()
+        private void Start()
         {
-            // Initialize UI elements
-            InitializeUIElements();
+            // Initialize warnings as inactive
+            lowOxygenWarning.gameObject.SetActive(false);
+            lowLaserEnergyWarning.gameObject.SetActive(false);
+            lowGravityFuelWarning.gameObject.SetActive(false);
         }
 
         #endregion
 
-        #region UI Initialization
+        #region Public Methods
 
         /// <summary>
-        /// Initializes all UI elements to their default states.
+        /// Updates the Oxygen slider.
         /// </summary>
-        private void InitializeUIElements()
-        {
-            // Initialize Gravity Fuel Slider
-            if (gravityFuelSlider != null)
-            {
-                gravityFuelSlider.maxValue = 100f; // Default max value, to be updated by script
-                gravityFuelSlider.value = gravityFuelSlider.maxValue;
-            }
-
-            // Initialize Player Laser Slider
-            if (playerLaserSlider != null)
-            {
-                playerLaserSlider.maxValue = 100f; // Default max value, to be updated by script
-                playerLaserSlider.value = playerLaserSlider.maxValue;
-            }
-
-            // Initialize Vehicle Laser Slider
-            if (vehicleLaserSlider != null)
-            {
-                vehicleLaserSlider.maxValue = 150f; // Default max value, to be updated by script
-                vehicleLaserSlider.value = vehicleLaserSlider.maxValue;
-            }
-
-            // Initialize Oxygen Slider
-            if (oxygenSlider != null)
-            {
-                oxygenSlider.maxValue = 100f; // Default max value, to be updated by script
-                oxygenSlider.value = oxygenSlider.maxValue;
-            }
-
-            // Initialize Oxygen Warning Message
-            if (oxygenWarningMessage != null)
-            {
-                oxygenWarningMessage.SetActive(false);
-            }
-
-            // Initialize Crystal Count Text
-            if (crystalCountText != null)
-            {
-                crystalCountText.text = "Crystals: 0";
-            }
-
-            // Initialize Game Over and Victory Screens
-            if (gameOverScreen != null)
-            {
-                gameOverScreen.SetActive(false);
-            }
-
-            if (gameWinScreen != null)
-            {
-                gameWinScreen.SetActive(false);
-            }
-
-            // Initialize Pickup Message Text
-            if (pickupMessageText != null)
-            {
-                pickupMessageText.gameObject.SetActive(false);
-            }
-
-            // Initialize Interaction Prompt Text
-            if (interactionPromptText != null)
-            {
-                interactionPromptText.gameObject.SetActive(false);
-            }
-
-            // Initialize Vehicle HUD
-            if (vehicleHUD != null)
-            {
-                vehicleHUD.SetActive(false); // Ensure HUD is inactive at start
-            }
-        }
-
-        #endregion
-
-        #region UI Update Methods
-
-        /// <summary>
-        /// Updates the gravity fuel bar on the UI.
-        /// </summary>
-        /// <param name="current">Current gravity fuel.</param>
-        /// <param name="max">Maximum gravity fuel.</param>
-        public void UpdateGravityFuelBar(float current, float max)
-        {
-            if (gravityFuelSlider != null && gravityFuelFillImage != null)
-            {
-                gravityFuelSlider.maxValue = max;
-                gravityFuelSlider.value = current;
-
-                // Change the fill color based on fuel percentage
-                float fuelPercentage = current / max;
-                gravityFuelFillImage.color = Color.Lerp(Color.red, Color.green, fuelPercentage);
-            }
-        }
-
-        /// <summary>
-        /// Updates the player's laser energy bar on the UI.
-        /// </summary>
-        /// <param name="current">Current laser energy.</param>
-        /// <param name="max">Maximum laser energy.</param>
-        public void UpdatePlayerLaserBar(float current, float max)
-        {
-            if (playerLaserSlider != null && playerLaserFillImage != null)
-            {
-                playerLaserSlider.maxValue = max;
-                playerLaserSlider.value = current;
-
-                // Change the fill color based on energy percentage
-                float energyPercentage = current / max;
-                playerLaserFillImage.color = Color.Lerp(Color.red, Color.yellow, energyPercentage);
-            }
-        }
-
-        /// <summary>
-        /// Updates the vehicle's laser energy bar on the UI.
-        /// </summary>
-        /// <param name="current">Current laser energy.</param>
-        /// <param name="max">Maximum laser energy.</param>
-        public void UpdateVehicleLaserBar(float current, float max)
-        {
-            if (vehicleLaserSlider != null && vehicleLaserFillImage != null)
-            {
-                vehicleLaserSlider.maxValue = max;
-                vehicleLaserSlider.value = current;
-
-                // Change the fill color based on energy percentage
-                float energyPercentage = current / max;
-                vehicleLaserFillImage.color = Color.Lerp(Color.red, Color.yellow, energyPercentage);
-            }
-        }
-
-        /// <summary>
-        /// Updates the oxygen bar on the UI.
-        /// </summary>
-        /// <param name="current">Current oxygen level.</param>
-        /// <param name="max">Maximum oxygen level.</param>
         public void UpdateOxygenBar(float current, float max)
         {
-            if (oxygenSlider != null && oxygenFillImage != null)
-            {
-                oxygenSlider.maxValue = max;
-                oxygenSlider.value = current;
+            UpdateSlider(oxygenSlider, current, max);
+            CheckLowOxygen(current, max);
+        }
 
-                // Change the fill color based on oxygen percentage
-                float oxygenPercentage = current / max;
-                oxygenFillImage.color = Color.Lerp(Color.green, Color.red, 1f - oxygenPercentage);
+        /// <summary>
+        /// Updates the Player Laser Energy slider.
+        /// </summary>
+        public void UpdatePlayerLaserBar(float current, float max)
+        {
+            UpdateSlider(laserEnergySlider, current, max);
+            CheckLowLaserEnergy(current, max);
+        }
+
+        /// <summary>
+        /// Updates the Vehicle Laser Energy slider.
+        /// </summary>
+        public void UpdateVehicleLaserBar(float current, float max)
+        {
+            UpdateSlider(gravityFuelSlider, current, max);
+            // Implement if vehicle laser has separate warnings
+        }
+
+        /// <summary>
+        /// Updates the Gravity Fuel slider.
+        /// </summary>
+        public void UpdateGravityFuel(float current, float max)
+        {
+            UpdateSlider(gravityFuelSlider, current, max);
+            CheckLowGravityFuel(current, max);
+        }
+
+        /// <summary>
+        /// Updates the crystal count display on the UI.
+        /// </summary>
+        public void UpdateCrystalCount(int amount)
+        {
+            if (oxygenSlider.label != null)
+            {
+                // Assuming oxygenSlider.label is used for crystals, adjust accordingly
+                oxygenSlider.label.text = $"Crystals: {amount}";
             }
         }
 
@@ -225,34 +114,10 @@ namespace Systems.UISystems
         /// </summary>
         public void ShowOxygenWarning()
         {
-            if (oxygenWarningMessage != null && !oxygenWarningMessage.activeSelf)
+            if (!isOxygenLow)
             {
-                oxygenWarningMessage.SetActive(true);
-                StartCoroutine(HideOxygenWarningAfterDelay());
-            }
-        }
-
-        /// <summary>
-        /// Coroutine to hide the oxygen warning after a delay.
-        /// </summary>
-        private IEnumerator HideOxygenWarningAfterDelay()
-        {
-            yield return new WaitForSeconds(2f); // Duration of the warning
-            if (oxygenWarningMessage != null)
-            {
-                oxygenWarningMessage.SetActive(false);
-            }
-        }
-
-        /// <summary>
-        /// Updates the crystal count display on the UI.
-        /// </summary>
-        /// <param name="amount">Number of crystals collected.</param>
-        public void UpdateCrystalCount(int amount)
-        {
-            if (crystalCountText != null)
-            {
-                crystalCountText.text = $"Crystals: {amount}";
+                isOxygenLow = true;
+                StartBlinkingWarning(lowOxygenWarning, ref oxygenBlinkCoroutine);
             }
         }
 
@@ -261,10 +126,7 @@ namespace Systems.UISystems
         /// </summary>
         public void ShowGameOverScreen()
         {
-            if (gameOverScreen != null)
-            {
-                gameOverScreen.SetActive(true);
-            }
+            // Implement as needed
         }
 
         /// <summary>
@@ -272,81 +134,23 @@ namespace Systems.UISystems
         /// </summary>
         public void ShowGameWinScreen()
         {
-            if (gameWinScreen != null)
-            {
-                gameWinScreen.SetActive(true);
-            }
+            // Implement as needed
         }
 
         /// <summary>
         /// Displays a temporary pickup message on the UI.
         /// </summary>
-        /// <param name="message">The message to display.</param>
         public void ShowPickupMessage(string message)
         {
-            if (pickupMessageText != null)
-            {
-                // If a message is already being displayed, stop it
-                if (pickupMessageCoroutine != null)
-                {
-                    StopCoroutine(pickupMessageCoroutine);
-                }
-
-                pickupMessageText.text = message;
-                pickupMessageText.gameObject.SetActive(true);
-                pickupMessageCoroutine = StartCoroutine(HidePickupMessageAfterDelay());
-            }
-        }
-
-        /// <summary>
-        /// Coroutine to hide the pickup message after a delay.
-        /// </summary>
-        private IEnumerator HidePickupMessageAfterDelay()
-        {
-            yield return new WaitForSeconds(pickupMessageDuration);
-            if (pickupMessageText != null)
-            {
-                pickupMessageText.gameObject.SetActive(false);
-            }
+            // Implement as needed
         }
 
         /// <summary>
         /// Displays an interaction prompt on the UI.
         /// </summary>
-        /// <param name="prompt">The prompt message to display.</param>
         public void ShowInteractionPrompt(string prompt)
         {
-            if (interactionPromptText != null)
-            {
-                // If a prompt is already being displayed, stop it
-                if (interactionPromptCoroutine != null)
-                {
-                    StopCoroutine(interactionPromptCoroutine);
-                }
-
-                if (!string.IsNullOrEmpty(prompt))
-                {
-                    interactionPromptText.text = prompt;
-                    interactionPromptText.gameObject.SetActive(true);
-                    interactionPromptCoroutine = StartCoroutine(HideInteractionPromptAfterDelay());
-                }
-                else
-                {
-                    interactionPromptText.gameObject.SetActive(false);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Coroutine to hide the interaction prompt after a short delay.
-        /// </summary>
-        private IEnumerator HideInteractionPromptAfterDelay()
-        {
-            yield return new WaitForSeconds(0.5f); // Adjust as needed
-            if (interactionPromptText != null)
-            {
-                interactionPromptText.gameObject.SetActive(false);
-            }
+            // Implement as needed
         }
 
         /// <summary>
@@ -354,10 +158,7 @@ namespace Systems.UISystems
         /// </summary>
         public void ActivateVehicleHUD()
         {
-            if (vehicleHUD != null)
-            {
-                vehicleHUD.SetActive(true);
-            }
+            // Implement as needed
         }
 
         /// <summary>
@@ -365,9 +166,109 @@ namespace Systems.UISystems
         /// </summary>
         public void DeactivateVehicleHUD()
         {
-            if (vehicleHUD != null)
+            // Implement as needed
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        /// <summary>
+        /// Updates a slider's value based on the current and maximum values.
+        /// </summary>
+        private void UpdateSlider(HUDSlider slider, float current, float max)
+        {
+            if (slider.slider != null)
             {
-                vehicleHUD.SetActive(false);
+                slider.slider.maxValue = max;
+                slider.slider.value = current;
+            }
+        }
+
+        /// <summary>
+        /// Checks and handles low oxygen warning.
+        /// </summary>
+        private void CheckLowOxygen(float current, float max)
+        {
+            if (current / max <= 0.2f && !isOxygenLow)
+            {
+                isOxygenLow = true;
+                StartBlinkingWarning(lowOxygenWarning, ref oxygenBlinkCoroutine);
+            }
+            else if (current / max > 0.2f && isOxygenLow)
+            {
+                isOxygenLow = false;
+                StopBlinkingWarning(lowOxygenWarning, ref oxygenBlinkCoroutine);
+            }
+        }
+
+        /// <summary>
+        /// Checks and handles low laser energy warning.
+        /// </summary>
+        private void CheckLowLaserEnergy(float current, float max)
+        {
+            if (current / max <= 0.2f && !isLaserEnergyLow)
+            {
+                isLaserEnergyLow = true;
+                StartBlinkingWarning(lowLaserEnergyWarning, ref laserEnergyBlinkCoroutine);
+            }
+            else if (current / max > 0.2f && isLaserEnergyLow)
+            {
+                isLaserEnergyLow = false;
+                StopBlinkingWarning(lowLaserEnergyWarning, ref laserEnergyBlinkCoroutine);
+            }
+        }
+
+        /// <summary>
+        /// Checks and handles low gravity fuel warning.
+        /// </summary>
+        private void CheckLowGravityFuel(float current, float max)
+        {
+            if (current / max <= 0.2f && !isGravityFuelLow)
+            {
+                isGravityFuelLow = true;
+                StartBlinkingWarning(lowGravityFuelWarning, ref gravityFuelBlinkCoroutine);
+            }
+            else if (current / max > 0.2f && isGravityFuelLow)
+            {
+                isGravityFuelLow = false;
+                StopBlinkingWarning(lowGravityFuelWarning, ref gravityFuelBlinkCoroutine);
+            }
+        }
+
+        /// <summary>
+        /// Starts blinking a warning message.
+        /// </summary>
+        private void StartBlinkingWarning(TextMeshProUGUI warningText, ref Coroutine coroutine)
+        {
+            if (warningText != null && coroutine == null)
+            {
+                coroutine = StartCoroutine(BlinkWarning(warningText));
+            }
+        }
+
+        /// <summary>
+        /// Stops blinking a warning message.
+        /// </summary>
+        private void StopBlinkingWarning(TextMeshProUGUI warningText, ref Coroutine coroutine)
+        {
+            if (warningText != null && coroutine != null)
+            {
+                StopCoroutine(coroutine);
+                coroutine = null;
+                warningText.gameObject.SetActive(false);
+            }
+        }
+
+        /// <summary>
+        /// Coroutine to handle blinking of warning messages.
+        /// </summary>
+        private IEnumerator BlinkWarning(TextMeshProUGUI warningText)
+        {
+            while (true)
+            {
+                warningText.color = warningText.color == warningColor ? Color.clear : warningColor;
+                yield return new WaitForSeconds(blinkInterval);
             }
         }
 

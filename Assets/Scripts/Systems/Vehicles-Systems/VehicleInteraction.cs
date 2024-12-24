@@ -1,8 +1,8 @@
-// File: Assets/Scripts/Systems/Vehicles-Systems/VehicleInteraction.cs
 using UnityEngine;
 using Core.Interfaces;
 using Core.Managers;
 using TMPro;
+using Systems.PlayerSystems; // Ensure this namespace is included to access PlayerManager
 
 namespace Systems.VehicleSystems
 {
@@ -10,6 +10,7 @@ namespace Systems.VehicleSystems
     /// Handles player interactions with the vehicle, allowing entering and exiting.
     /// Implements the IInteractable interface.
     /// </summary>
+    [RequireComponent(typeof(Collider))]
     public class VehicleInteraction : MonoBehaviour, IInteractable
     {
         #region Inspector Variables
@@ -18,7 +19,7 @@ namespace Systems.VehicleSystems
         [SerializeField] private KeyCode interactionKey = KeyCode.E;           // Key to enter/exit vehicle
 
         [Header("References")]
-        [SerializeField] private GameObject playerObject;                      // Reference to the Player GameObject
+        [SerializeField] private PlayerManager playerManager;                  // Reference to the PlayerManager script
         [SerializeField] private VehicleController vehicleController;          // Reference to the VehicleController script
         [SerializeField] private GravityFieldGenerator gravityFieldGenerator;  // Reference to the GravityFieldGenerator script
         [SerializeField] private Transform exitPoint;                          // Reference to the exit point Transform
@@ -66,7 +67,6 @@ namespace Systems.VehicleSystems
 
         /// <summary>
         /// Executes the interaction logic for entering or exiting the vehicle.
-        /// This method is called when the player interacts with the vehicle.
         /// </summary>
         public void Interact()
         {
@@ -103,28 +103,26 @@ namespace Systems.VehicleSystems
         /// </summary>
         private void EnterVehicle()
         {
-            if (playerObject == null || vehicleController == null || gravityFieldGenerator == null)
+            if (playerManager == null || vehicleController == null || gravityFieldGenerator == null)
             {
                 Debug.LogError("VehicleInteraction: Missing references. Please assign all required references in the Inspector.");
                 return;
             }
 
-            // Deactivate the player
-            playerObject.SetActive(false);
+            // Disable player controls
+            playerManager.SetPlayerControl(false);
 
-            // Activate the vehicle controller
-            vehicleController.enabled = true;
-
-            // Activate the gravity field
+            // Activate the vehicle's gravity field
             gravityFieldGenerator.SetGravityFieldActive(true);
 
             // Update state
             isPlayerInside = true;
 
-            // Optionally, adjust camera or UI settings here
-
-            // Hide interaction prompt
+            // Update interaction prompt
             ShowInteractionPrompt(false);
+
+            // Optional: Activate vehicle-specific HUD elements
+            UIManager.Instance?.ActivateVehicleHUD(); // Uncomment if applicable
 
             // Trigger event
             EventManager.Instance?.TriggerPlayerEnteredVehicle();
@@ -137,30 +135,30 @@ namespace Systems.VehicleSystems
         /// </summary>
         private void ExitVehicle()
         {
-            if (playerObject == null || vehicleController == null || gravityFieldGenerator == null || exitPoint == null)
+            if (playerManager == null || vehicleController == null || gravityFieldGenerator == null || exitPoint == null)
             {
                 Debug.LogError("VehicleInteraction: Missing references. Please assign all required references in the Inspector.");
                 return;
             }
 
-            // Deactivate the vehicle controller
-            vehicleController.enabled = false;
+            // Enable player controls
+            playerManager.SetPlayerControl(true);
 
-            // Deactivate the gravity field
+            // Deactivate the vehicle's gravity field
             gravityFieldGenerator.SetGravityFieldActive(false);
 
-            // Reactivate the player at the exit point
-            playerObject.SetActive(true);
-            playerObject.transform.position = exitPoint.position;
-            playerObject.transform.rotation = exitPoint.rotation;
+            // Move player to exit point
+            playerManager.transform.position = exitPoint.position;
+            playerManager.transform.rotation = exitPoint.rotation;
 
             // Update state
             isPlayerInside = false;
 
-            // Optionally, adjust camera or UI settings here
-
-            // Show interaction prompt if player is still in range
+            // Update interaction prompt
             ShowInteractionPrompt(true);
+
+            // Optional: Deactivate vehicle-specific HUD elements
+            UIManager.Instance?.DeactivateVehicleHUD(); // Uncomment if applicable
 
             // Trigger event
             EventManager.Instance?.TriggerPlayerExitedVehicle();
@@ -177,7 +175,7 @@ namespace Systems.VehicleSystems
             if (interactionCanvas != null)
             {
                 interactionCanvas.gameObject.SetActive(show);
-                // Update the prompt text based on the state
+                // Update the prompt text based on the current state
                 if (show && interactionCanvas.TryGetComponent<TextMeshProUGUI>(out TextMeshProUGUI promptText))
                 {
                     promptText.text = isPlayerInside ? "Press E to exit vehicle" : "Press E to enter vehicle";

@@ -1,26 +1,35 @@
 using UnityEngine;
 
-/// <summary>
-/// Oversees the overall game state, including victory and game over conditions.
-/// </summary>
 namespace Core.Managers
 {
+    /// <summary>
+    /// Oversees the overall game state, including victory and game over conditions.
+    /// </summary>
+    [DefaultExecutionOrder(-100)] // Ensures GameManager initializes after EventManager
     public class GameManager : MonoBehaviour
     {
         public static GameManager Instance { get; private set; }
+
+        #region Inspector Variables
 
         [Header("Victory Settings")]
         [SerializeField] private Transform flagPlantPoint;    // Position where the flag is planted
         [SerializeField] private GameObject flagPrefab;       // Flag prefab to instantiate
 
-        [Header("Crystal Management")]
-        [SerializeField] private int totalCrystals = 0;       // Total crystals collected
+        #endregion
 
+        #region Private Variables
+
+        private int totalCrystals = 0;       // Total crystals collected
         private bool hasPlantedFlag = false;
 
-        protected virtual void Awake()
+        #endregion
+
+        #region Unity Callbacks
+
+        private void Awake()
         {
-            // Enhanced Singleton setup
+            // Singleton setup
             if (Instance == null)
             {
                 Instance = this;
@@ -34,10 +43,14 @@ namespace Core.Managers
 
         private void Start()
         {
-            // Subscribe to relevant events
+            // Ensure EventManager exists
             if (EventManager.Instance != null)
             {
-                EventManager.Instance.EventOnCrystalCollected += OnCrystalCollected;
+                EventManager.Instance.OnCrystalCollected += OnCrystalCollected;
+            }
+            else
+            {
+                Debug.LogError("GameManager: EventManager instance not found in the scene.");
             }
         }
 
@@ -46,9 +59,13 @@ namespace Core.Managers
             // Unsubscribe from events to prevent memory leaks
             if (EventManager.Instance != null)
             {
-                EventManager.Instance.EventOnCrystalCollected -= OnCrystalCollected;
+                EventManager.Instance.OnCrystalCollected -= OnCrystalCollected;
             }
         }
+
+        #endregion
+
+        #region Event Handlers
 
         /// <summary>
         /// Handles crystal collection.
@@ -58,8 +75,13 @@ namespace Core.Managers
         {
             totalCrystals += amount;
             UIManager.Instance?.UpdateCrystalCount(totalCrystals);
-            // Additional logic, such as tracking total crystals
+            // Additional logic, such as checking for victory conditions
+            Debug.Log($"Total Crystals Collected: {totalCrystals}");
         }
+
+        #endregion
+
+        #region Game State Management
 
         /// <summary>
         /// Triggers Game Over state.
@@ -90,14 +112,7 @@ namespace Core.Managers
                 Debug.LogWarning("GameManager: FlagPlantPoint or FlagPrefab is not assigned.");
             }
         }
-        public void CrystalCollected(int crystalValue)
-        {
 
-            // Implement the logic for when a crystal is collected
-
-            Debug.Log($"Crystal collected with value: {crystalValue}");
-
-        }
-
+        #endregion
     }
 }

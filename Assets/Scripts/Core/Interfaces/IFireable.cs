@@ -12,10 +12,15 @@ namespace Core.Interfaces
         /// </summary>
         /// <param name="direction">Direction in which to fire.</param>
         void Fire(Vector3 direction);
-    
+
         /// <summary>
         /// Stops the firing action.
         /// </summary>
         void StopFiring();
+
+        /// <summary>
+        /// Indicates whether the object is currently firing.
+        /// </summary>
+        bool IsFiring { get; }
     }
 }

@@ -1,42 +1,28 @@
 // File: Assets/Scripts/Systems/Environment-Systems/CollectiblePickup.cs
 using UnityEngine;
 using Core.Interfaces;
-using Systems.EnvironmentSystems;
-using Systems.VehicleSystems;
 using Core.Managers;
+using Systems.VehicleSystems;
+using Core.Utilities;
 
-namespace EnvironmentSystems
+namespace Systems.EnvironmentSystems
 {
-    /// <summary>
-    /// Represents a collectible item that replenishes the player's gravity fuel upon pickup.
-    /// Implements the IPickup interface.
-    /// </summary>
     [RequireComponent(typeof(Collider))]
-    public class CollectiblePickup : MonoBehaviour, IPickup
+    public class CollectiblePickup : MonoBehaviour, IPickup, IPooledObject
     {
-        #region Inspector Variables
-
         [Header("Pickup Settings")]
-        [SerializeField] private float gravityFuelAmount = 20f;            // Amount of gravity fuel to replenish
-        [SerializeField] private bool destroyOnPickup = true;             // Whether to destroy the pickup after collection
+        [SerializeField] private float gravityFuelAmount = 20f;
+        [SerializeField] private bool destroyOnPickup = false;
 
         [Header("Feedback Settings")]
-        [SerializeField] private AudioClip pickupSound;                    // Sound to play upon pickup
-        [SerializeField] private ParticleSystem pickupEffectPrefab;        // Particle effect to instantiate upon pickup
+        [SerializeField] private AudioClip pickupSound;
+        [SerializeField] private ParticleSystem pickupEffectPrefab;
+        [SerializeField] private string poolTag = "Collectible";
 
-        #endregion
-
-        #region Private Variables
-
-        private bool isCollected = false;                                 // Flag to prevent multiple pickups
-
-        #endregion
-
-        #region Unity Callbacks
+        private bool isCollected = false;
 
         private void Awake()
         {
-            // Ensure the Collider is set as a trigger
             Collider col = GetComponent<Collider>();
             if (!col.isTrigger)
             {
@@ -47,74 +33,63 @@ namespace EnvironmentSystems
 
         private void OnTriggerEnter(Collider other)
         {
-            if (isCollected) return; // Prevent multiple pickups
+            if (isCollected) return;
 
-            // Check if the collider belongs to the player
-            if (other.CompareTag("Player"))
+            if (other.CompareTag("Player") || other.CompareTag("Vehicle"))
             {
                 OnPickup(other);
             }
         }
 
-        #endregion
-
-        #region IPickup Implementation
-
-        /// <summary>
-        /// Handles the pickup action when interacted with by the player.
-        /// </summary>
-        /// <param name="other">Collider of the object interacting with the pickup.</param>
-        public void OnPickup(Collider other)
+        public void OnPickup(Collider collector)
         {
-            if (isCollected) return; // Prevent multiple pickups
+            if (isCollected) return;
 
-            // Find the VehicleController in the player's hierarchy
-            VehicleController vehicleController = other.GetComponentInChildren<VehicleController>();
-            if (vehicleController != null)
+            IFuelReplenisher fuelReplenisher = collector.GetComponentInParent<IFuelReplenisher>();
+            if (fuelReplenisher != null)
             {
-                // Replenish gravity fuel
-                vehicleController.ReplenishGravityFuel(gravityFuelAmount);
+                fuelReplenisher.ReplenishFuel(gravityFuelAmount);
 
-                // Play pickup sound
-                if (pickupSound != null)
-                {
-                    AudioSource.PlayClipAtPoint(pickupSound, transform.position);
-                }
+                SoundManager.Instance?.PlayCrystalPickup();
 
-                // Instantiate pickup effect
                 if (pickupEffectPrefab != null)
                 {
                     Instantiate(pickupEffectPrefab, transform.position, Quaternion.identity);
                 }
 
-                // Provide UI feedback
-                EventManager.Instance?.CrystalCollected(1); // Notify about crystal collection
                 UIManager.Instance?.ShowPickupMessage($"Gravity Fuel +{gravityFuelAmount}");
 
-                // Trigger crystal collection event
-                // Already done above via EventManager
+                EventManager.Instance?.CrystalCollected(1);
 
-                // Set the pickup as collected
                 isCollected = true;
 
-                // Destroy or deactivate the pickup
-                if (destroyOnPickup)
-                {
-                    Destroy(gameObject);
-                }
-                else
-                {
-                    gameObject.SetActive(false);
-                }
+                ObjectPooler.Instance?.ReturnToPool(poolTag, gameObject);
 
-                Debug.Log($"{gameObject.name}: Pickup collected by Player.");
+                Debug.Log($"{gameObject.name}: Pickup collected by {collector.name}.");
             }
             else
             {
-                Debug.LogWarning($"{gameObject.name}: VehicleController not found on Player.");
+                Debug.LogWarning($"{gameObject.name}: IFuelReplenisher not found on collector.");
             }
         }
 
-        #endregion
+        public float GetPickupAmount()
+        {
+            return gravityFuelAmount;
+        }
+
+        public void OnObjectSpawn()
+        {
+            isCollected = false;
+            gameObject.SetActive(true);
+        }
+
+        public void OnObjectReturn()
+        {
+            isCollected = false;
+            transform.position = Vector3.zero;
+            transform.rotation = Quaternion.identity;
+            gameObject.SetActive(false);
+        }
     }
 }

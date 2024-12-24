@@ -1,5 +1,3 @@
-using UnityEngine;
-
 namespace Core.Interfaces
 {
     /// <summary>
