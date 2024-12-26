@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class PlayerOxygen : MonoBehaviour
 {
+    public GameManager gameManager;
     [Header("Oxygen Settings")]
     public float maxOxygen = 100f;
     public float currentOxygen;
@@ -13,7 +14,7 @@ public class PlayerOxygen : MonoBehaviour
         UIManager.Instance?.UpdateOxygenBar(currentOxygen, maxOxygen);
     }
 
-    private void Update()
+    public void Update()
     {
         // Deplete oxygen over time
         currentOxygen -= depletionRate * Time.deltaTime;
@@ -32,7 +33,8 @@ public class PlayerOxygen : MonoBehaviour
         // Check for oxygen depletion
         if (currentOxygen <= 0f)
         {
-            GameManager.Instance?.GameOver();
+            Debug.Log("Out of oxygen!");
+            gameManager.GameOver();
         }
     }
 

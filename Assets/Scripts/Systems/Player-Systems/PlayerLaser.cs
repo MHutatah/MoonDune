@@ -120,7 +120,7 @@ public class PlayerLaser : MonoBehaviour
         currentLaserRange = Mathf.Clamp(currentLaserRange, 0f, laserRange);
 
         // Update UI
-        UIManager.Instance?.UpdatePlayerLaserBar(currentLaserEnergy, maxLaserEnergy);
+        UIManager.Instance?.UpdateLaserEnergyBar(currentLaserEnergy, maxLaserEnergy);
     }
 
     /// <summary>
@@ -180,7 +180,7 @@ public class PlayerLaser : MonoBehaviour
         {
             currentLaserEnergy += rechargeRate * Time.deltaTime;
             currentLaserEnergy = Mathf.Clamp(currentLaserEnergy, 0f, maxLaserEnergy);
-            UIManager.Instance?.UpdatePlayerLaserBar(currentLaserEnergy, maxLaserEnergy);
+            UIManager.Instance?.UpdateLaserEnergyBar(currentLaserEnergy, maxLaserEnergy);
         }
     }
 
@@ -235,11 +235,9 @@ public class PlayerLaser : MonoBehaviour
     public void ReplenishLaserEnergy(float amount)
     {
         currentLaserEnergy = Mathf.Min(currentLaserEnergy + amount, maxLaserEnergy);
-        UIManager.Instance?.UpdatePlayerLaserBar(currentLaserEnergy, maxLaserEnergy);
+        UIManager.Instance?.UpdateLaserEnergyBar(currentLaserEnergy, maxLaserEnergy);
         Debug.Log($"Player Laser Energy Replenished by: {amount}");
     }
 
     #endregion
 }
-
-

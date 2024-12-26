@@ -3,6 +3,7 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public class CollectiblePickup : MonoBehaviour
 {
+    public Collider col;
     #region Inspector Variables
 
     [Header("Pickup Settings")]
@@ -26,21 +27,22 @@ public class CollectiblePickup : MonoBehaviour
     private void Awake()
     {
         // Ensure the Collider is set as a trigger
-        Collider col = GetComponent<Collider>();
-        if (!col.isTrigger)
-        {
-            col.isTrigger = true;
-            Debug.LogWarning($"{gameObject.name}: Collider was not set as a trigger. Automatically setting it to trigger.");
-        }
+        //Collider col = GetComponent<Collider>();
+        // if (!col.isTrigger)
+        // {
+        //     col.isTrigger = true;
+        //     Debug.LogWarning($"{gameObject.name}: Collider was not set as a trigger. Automatically setting it to trigger.");
+        // }
     }
 
-    private void OnTriggerEnter(Collider other)
+    public void OnTriggerEnter(Collider other)
     {
         if (isCollected) return; // Prevent multiple pickups
-
+        Debug.Log("Pickup hit");
         // Check if the collider belongs to the player
         if (other.CompareTag("Player"))
         {
+            Debug.Log("Hitter is Player!");
             VehicleController vehicleController = other.GetComponentInChildren<VehicleController>();
             if (vehicleController != null)
             {
@@ -64,6 +66,7 @@ public class CollectiblePickup : MonoBehaviour
 
                 // Set the pickup as collected
                 isCollected = true;
+                Debug.Log("Pickup collected");
 
                 // Destroy or deactivate the pickup
                 if (destroyOnPickup)

@@ -1,7 +1,9 @@
 using UnityEngine;
+using System; // Import System for Action
 
 /// <summary>
 /// Controls the vehicle's movement, floating mechanics, gravity toggling, and gravity fuel management.
+/// Enhanced for smooth driving on uneven terrain.
 /// </summary>
 [RequireComponent(typeof(Rigidbody))]
 public class VehicleController : MonoBehaviour
@@ -9,35 +11,52 @@ public class VehicleController : MonoBehaviour
     #region Inspector Variables
 
     [Header("Floating Settings")]
-    [SerializeField] private float floatingHeight = 5f;            // Desired height when floating
-    [SerializeField] private float floatingForce = 10f;            // Force applied to maintain floating
-    [SerializeField] private float floatingDamping = 2f;           // Damping to smooth floating motion
+    [SerializeField] private float floatingHeight = 2f;
+    [SerializeField] private float floatingForce = 10f;
+    [SerializeField] private float floatingDamping = 5f;
+
+    [Header("Raycast Settings")]
+    [SerializeField] private Transform[] groundRayOrigins; // Assign transforms at each wheel position
+    [SerializeField] private float rayLength = 1.5f;
+    [SerializeField] private float suspensionForceMultiplier = 10f;
 
     [Header("Grounded Settings")]
-    [SerializeField] private LayerMask groundLayer;                // Layer representing the ground
-    [SerializeField] private float groundCheckDistance = 1f;       // Distance to check for ground
+    [SerializeField] private LayerMask groundLayer; // Layer representing the terrain or ground
 
     [Header("Movement Settings")]
-    [SerializeField] private float moveSpeed = 10f;                // Movement speed of the vehicle
-    [SerializeField] private float rotationSpeed = 100f;           // Rotation speed of the vehicle
+    [SerializeField] private float moveSpeed = 500f;
+    [SerializeField] private float rotationSpeed = 200f; // Increased for better responsiveness
+    [SerializeField] private float maxMoveSpeed = 20f;
 
     [Header("Gravity Fuel Settings")]
-    [SerializeField] private float maxGravityFuel = 100f;          // Maximum gravity fuel capacity
-    [SerializeField] private float gravityFuelDrainRate = 10f;     // Fuel drained per second while gravity is on
-    [SerializeField] private float gravityFuelRechargeRate = 5f;   // Fuel replenished per second when gravity is off
-    [SerializeField] private KeyCode gravityToggleKey = KeyCode.G; // Key to toggle gravity
+    [SerializeField] private float maxGravityFuel = 100f;
+    [SerializeField] private float gravityFuelDrainRate = 10f;
+    [SerializeField] private float gravityFuelRechargeRate = 5f;
+    [SerializeField] private KeyCode gravityToggleKey = KeyCode.G;
 
     [Header("Gravity Field Settings")]
-    [SerializeField] private GravityFieldGenerator gravityFieldGenerator; // Reference to the GravityFieldGenerator script
+    [SerializeField] private GravityFieldGenerator gravityFieldGenerator;
 
     #endregion
 
     #region Private Variables
 
-    private Rigidbody rb;                                           // Reference to the Rigidbody component
-    public bool isGravityOn = true;                                // Current state of gravity
-    private bool isGrounded = false;                                // Whether the vehicle is grounded
-    private float currentGravityFuel;                               // Current gravity fuel level
+    private Rigidbody rb;
+    private bool isGrounded;
+    public bool IsGravityOn { get; private set; } = true; // Public property for gravity state
+    private float currentGravityFuel;
+
+    private Vector3 averageNormal;
+
+    #endregion
+
+    #region Events
+
+    /// <summary>
+    /// Event triggered when the gravity state changes.
+    /// Passes the new gravity state as a boolean.
+    /// </summary>
+    public event Action<bool> OnGravityStateChanged;
 
     #endregion
 
@@ -57,40 +76,42 @@ public class VehicleController : MonoBehaviour
     {
         HandleGravityToggle();
         HandleMovementInput();
-        CheckGroundedStatus();
         ManageGravityFuel();
     }
 
     private void FixedUpdate()
     {
-        if (isGravityOn && currentGravityFuel > 0f)
+        CheckGroundedStatus();
+
+        if (IsGravityOn && currentGravityFuel > 0f)
         {
-            MaintainGroundedState();
+            ApplySuspensionForAllWheels();
         }
         else
         {
             MaintainFloatingState();
             SuspendVehicleMotion();
         }
+
+        AlignToTerrain();
+        ApplyDamping();
+        LimitSpeed();
     }
 
     #endregion
 
     #region Initialization
 
-    /// <summary>
-    /// Initializes the vehicle's Rigidbody settings and gravity fuel.
-    /// </summary>
     private void InitializeVehicle()
     {
-        rb.useGravity = isGravityOn;
-        rb.constraints = RigidbodyConstraints.FreezeRotation; // Prevent the vehicle from tipping over
+        rb.useGravity = IsGravityOn;
+        // Freeze rotation on X and Z axes to prevent tipping, allow Y-axis rotation
+        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
         currentGravityFuel = maxGravityFuel;
 
-        // Initialize the Gravity Field Generator
         if (gravityFieldGenerator != null)
         {
-            gravityFieldGenerator.SetGravityFieldActive(isGravityOn && currentGravityFuel > 0f);
+            gravityFieldGenerator.SetGravityFieldActive(IsGravityOn && currentGravityFuel > 0f);
         }
         else
         {
@@ -102,68 +123,43 @@ public class VehicleController : MonoBehaviour
 
     #region Gravity Toggle Logic
 
-    /// <summary>
-    /// Handles input to toggle gravity on and off based on fuel availability.
-    /// </summary>
     private void HandleGravityToggle()
     {
         if (Input.GetKeyDown(gravityToggleKey))
         {
-            if (isGravityOn)
+            if (IsGravityOn || currentGravityFuel > 0f)
             {
-                // Allow turning off gravity at any time
                 ToggleGravity();
             }
             else
             {
-                // Allow turning on gravity only if enough fuel is available
-                if (currentGravityFuel > 0f)
-                {
-                    ToggleGravity();
-                }
-                else
-                {
-                    Debug.Log("Insufficient Gravity Fuel to Enable Gravity!");
-                    // Optionally, provide UI feedback to the player
-                    //UIManager.Instance?.ShowInsufficientFuelMessage(true);
-                }
+                Debug.Log("Insufficient Gravity Fuel to Enable Gravity!");
             }
         }
     }
 
-    /// <summary>
-    /// Toggles the gravity state of the vehicle.
-    /// </summary>
     private void ToggleGravity()
     {
-        isGravityOn = !isGravityOn;
-        rb.useGravity = isGravityOn;
+        IsGravityOn = !IsGravityOn;
+        rb.useGravity = IsGravityOn;
 
-        if (isGravityOn)
+        if (gravityFieldGenerator != null)
+        {
+            gravityFieldGenerator.SetGravityFieldActive(IsGravityOn && currentGravityFuel > 0f);
+        }
+
+        // Invoke the event to notify subscribers of the gravity state change
+        OnGravityStateChanged?.Invoke(IsGravityOn && currentGravityFuel > 0f);
+
+        if (IsGravityOn)
         {
             Debug.Log("Gravity Enabled: Vehicle is now grounded.");
-            // Reset velocities to prevent unintended motion when gravity is re-enabled
             rb.velocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-
-            // Update Gravity Field Generator
-            if (gravityFieldGenerator != null)
-            {
-                gravityFieldGenerator.SetGravityFieldActive(isGravityOn && currentGravityFuel > 0f);
-            }
-
-            // Hide insufficient fuel message if previously shown
-            //UIManager.Instance?.ShowInsufficientFuelMessage(false);
+            rb.angularVelocity = Vector3.zero; // Reset angular velocity to prevent residual spinning
         }
         else
         {
             Debug.Log("Gravity Disabled: Vehicle is now floating.");
-
-            // Update Gravity Field Generator
-            if (gravityFieldGenerator != null)
-            {
-                gravityFieldGenerator.SetGravityFieldActive(isGravityOn && currentGravityFuel > 0f);
-            }
         }
     }
 
@@ -171,91 +167,74 @@ public class VehicleController : MonoBehaviour
 
     #region Grounded State Management
 
-    /// <summary>
-    /// Checks whether the vehicle is grounded by casting a ray downward.
-    /// </summary>
     private void CheckGroundedStatus()
     {
-        RaycastHit hit;
-        Vector3 origin = transform.position + Vector3.up * 0.1f; // Slightly above to prevent immediate collision
+        isGrounded = false;
 
-        if (Physics.Raycast(origin, Vector3.down, out hit, groundCheckDistance, groundLayer))
+        for (int i = 0; i < groundRayOrigins.Length; i++)
         {
-            isGrounded = true;
+            if (Physics.Raycast(groundRayOrigins[i].position, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
+            {
+                isGrounded = true;
+                break;
+            }
         }
-        else
-        {
-            isGrounded = false;
-        }
-    }
 
-    /// <summary>
-    /// Maintains the vehicle's grounded state by ensuring it stays on the ground.
-    /// </summary>
-    private void MaintainGroundedState()
-    {
-        if (isGrounded)
-        {
-            // Freeze vertical movement to keep the vehicle stationary on the ground
-            Vector3 velocity = rb.velocity;
-            velocity.y = 0f;
-            rb.velocity = velocity;
-        }
-        else
-        {
-            // Snap the vehicle back to the ground to prevent unintended floating
-            Vector3 position = transform.position;
-            position.y = Mathf.Max(position.y, 0f); // Assuming ground is at y=0
-            transform.position = position;
-        }
+        // Optional: Visualize the grounded status (can be removed in production)
+        Debug.DrawRay(transform.position, Vector3.down * rayLength, isGrounded ? Color.green : Color.red);
     }
 
     #endregion
 
     #region Floating State Management
 
-    /// <summary>
-    /// Maintains the vehicle's floating state by applying upward force to reach the desired height.
-    /// </summary>
     private void MaintainFloatingState()
     {
-        float currentHeight = transform.position.y;
-        float heightDifference = floatingHeight - currentHeight;
+        float averageHeight = 0f;
+        int hitCount = 0;
 
-        // Apply a force proportional to the height difference to maintain floating
-        Vector3 force = Vector3.up * (heightDifference * floatingForce) - Vector3.up * (rb.velocity.y * floatingDamping);
-        rb.AddForce(force, ForceMode.Acceleration);
+        for (int i = 0; i < groundRayOrigins.Length; i++)
+        {
+            if (Physics.Raycast(groundRayOrigins[i].position, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
+            {
+                averageHeight += hit.distance;
+                hitCount++;
+            }
+        }
+
+        if (hitCount > 0)
+        {
+            averageHeight /= hitCount;
+            float heightDifference = floatingHeight - averageHeight;
+            Vector3 force = Vector3.up * (heightDifference * floatingForce) - Vector3.up * (rb.velocity.y * floatingDamping);
+            rb.AddForce(force, ForceMode.Acceleration);
+        }
     }
 
     #endregion
 
     #region Movement Logic
 
-    /// <summary>
-    /// Handles player input for vehicle movement.
-    /// </summary>
     private void HandleMovementInput()
     {
-        // Only allow movement when gravity is on, the vehicle is grounded, and there's sufficient fuel
-        if (isGravityOn && isGrounded && currentGravityFuel > 0f)
+        if (IsGravityOn && isGrounded && currentGravityFuel > 0f)
         {
-            // Get input axes
-            float moveInput = Input.GetAxis("Vertical");     // W/S or Up/Down arrows
-            float rotateInput = Input.GetAxis("Horizontal"); // A/D or Left/Right arrows
+            float moveInput = Input.GetAxis("Vertical");
+            float rotateInput = Input.GetAxis("Horizontal");
 
-            // Calculate movement direction
-            Vector3 moveDirection = transform.forward * moveInput * moveSpeed;
+            Vector3 forwardForce = transform.forward * moveInput * moveSpeed * Time.fixedDeltaTime;
+            rb.AddForce(forwardForce, ForceMode.Acceleration);
 
-            // Apply movement
-            Vector3 velocity = rb.velocity;
-            velocity.x = moveDirection.x;
-            velocity.z = moveDirection.z;
-            rb.velocity = velocity;
+            float rotation = rotateInput * rotationSpeed * Time.fixedDeltaTime;
+            rb.AddTorque(Vector3.up * rotation, ForceMode.Acceleration);
+        }
+    }
 
-            // Apply rotation
-            float rotation = rotateInput * rotationSpeed * Time.deltaTime;
-            Quaternion turnRotation = Quaternion.Euler(0f, rotation, 0f);
-            rb.MoveRotation(rb.rotation * turnRotation);
+    private void LimitSpeed()
+    {
+        if (rb.velocity.magnitude > maxMoveSpeed)
+        {
+            rb.velocity = rb.velocity.normalized * maxMoveSpeed;
         }
     }
 
@@ -263,73 +242,35 @@ public class VehicleController : MonoBehaviour
 
     #region Gravity Fuel Management
 
-    /// <summary>
-    /// Manages gravity fuel depletion and replenishment.
-    /// </summary>
     private void ManageGravityFuel()
     {
-        if (isGravityOn && currentGravityFuel > 0f)
+        if (IsGravityOn && currentGravityFuel > 0f)
         {
-            // Deplete gravity fuel while gravity is on
             currentGravityFuel -= gravityFuelDrainRate * Time.deltaTime;
             currentGravityFuel = Mathf.Clamp(currentGravityFuel, 0f, maxGravityFuel);
 
-            // Update UI
             UIManager.Instance?.UpdateGravityFuelBar(currentGravityFuel, maxGravityFuel);
 
-            // Check if gravity fuel is depleted
             if (currentGravityFuel <= 0f)
             {
                 Debug.Log("Gravity Fuel Depleted! Disabling Gravity.");
-                // Automatically disable gravity
                 ToggleGravity();
             }
         }
-        else if (!isGravityOn && currentGravityFuel < maxGravityFuel)
+        else if (!IsGravityOn && currentGravityFuel < maxGravityFuel)
         {
-            // Replenish gravity fuel when gravity is off
             currentGravityFuel += gravityFuelRechargeRate * Time.deltaTime;
             currentGravityFuel = Mathf.Clamp(currentGravityFuel, 0f, maxGravityFuel);
 
-            // Update UI
             UIManager.Instance?.UpdateGravityFuelBar(currentGravityFuel, maxGravityFuel);
         }
     }
 
-    /// <summary>
-    /// Retrieves the current gravity fuel level.
-    /// </summary>
-    /// <returns>Current gravity fuel.</returns>
     public float GetCurrentGravityFuel()
     {
         return currentGravityFuel;
     }
 
-    #endregion
-
-    #region Suspension of Vehicle Motion
-
-    /// <summary>
-    /// Gradually suspends vehicle motion by reducing velocity to zero.
-    /// </summary>
-    private void SuspendVehicleMotion()
-    {
-        if (rb.velocity != Vector3.zero)
-        {
-            // Reduce velocity gradually
-            rb.velocity = Vector3.Lerp(rb.velocity, Vector3.zero, Time.fixedDeltaTime * 2f); // Adjust the multiplier for speed
-            rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, Time.fixedDeltaTime * 2f);
-        }
-    }
-
-    #endregion
-
-    #region Public Methods
-
-    /// <summary>
-    /// Replenishes the vehicle's gravity fuel. Can be called externally.
-    /// </summary>
-    /// <param name="amount">Amount of gravity fuel to add.</param>
     public void ReplenishGravityFuel(float amount)
     {
         currentGravityFuel = Mathf.Min(currentGravityFuel + amount, maxGravityFuel);
@@ -338,6 +279,75 @@ public class VehicleController : MonoBehaviour
     }
 
     #endregion
+
+    #region Suspension System
+
+    private void ApplySuspensionForAllWheels()
+    {
+        averageNormal = Vector3.zero;
+        int groundedWheels = 0;
+
+        for (int i = 0; i < groundRayOrigins.Length; i++)
+        {
+            if (Physics.Raycast(groundRayOrigins[i].position, Vector3.down, out RaycastHit hit, rayLength, groundLayer))
+            {
+                float compression = rayLength - hit.distance;
+                Vector3 suspensionForce = Vector3.up * compression * floatingForce * suspensionForceMultiplier;
+                rb.AddForceAtPosition(suspensionForce, groundRayOrigins[i].position, ForceMode.Acceleration);
+
+                averageNormal += hit.normal;
+                groundedWheels++;
+                Debug.DrawRay(groundRayOrigins[i].position, Vector3.down * hit.distance, Color.green);
+            }
+            else
+            {
+                Debug.DrawRay(groundRayOrigins[i].position, Vector3.down * rayLength, Color.red);
+            }
+        }
+
+        if (groundedWheels > 0)
+        {
+            averageNormal /= groundedWheels;
+            Quaternion targetRotation = Quaternion.FromToRotation(transform.up, averageNormal) * transform.rotation;
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 5f);
+        }
+    }
+
+    #endregion
+
+    #region Terrain Alignment
+
+    private void AlignToTerrain()
+    {
+        if (averageNormal != Vector3.zero)
+        {
+            Quaternion targetRotation = Quaternion.FromToRotation(transform.up, averageNormal) * transform.rotation;
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 5f);
+        }
+    }
+
+    #endregion
+
+    #region Suspension of Vehicle Motion
+
+    private void SuspendVehicleMotion()
+    {
+        if (rb.velocity != Vector3.zero)
+        {
+            rb.velocity = Vector3.Lerp(rb.velocity, Vector3.zero, Time.fixedDeltaTime * 2f);
+            rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, Time.fixedDeltaTime * 2f);
+        }
+    }
+
+    #endregion
+
+    #region Damping and Speed Control
+
+    private void ApplyDamping()
+    {
+        rb.velocity *= 0.99f; // Adjust damping factor as needed
+        rb.angularVelocity *= 0.95f;
+    }
+
+    #endregion
 }
-
-

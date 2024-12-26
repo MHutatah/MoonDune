@@ -6,6 +6,21 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/OutdoorsScene.unity
+    path: Assets/Scenes/StoryCOMIC.unity
+    guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 0
+    path: Assets/Scenes/TestingScene.unity
     guid: 8124e5870f4fd4c779e7a5f994e84ad1
+  - enabled: 0
+    path: Assets/Scenes/LunarLandscape3D.unity
+    guid: f1fad55398cbbe948854ebdaf6d27d1a
+  - enabled: 1
+    path: Assets/Scenes/LunarLand.unity
+    guid: d330050ce17ba794a8b72bbb5fa7fc51
+  - enabled: 1
+    path: Assets/Scenes/DeathScene.unity
+    guid: dc42370f62447084aacda66ddfc5f705
+  - enabled: 1
+    path: Assets/Scenes/WinningScene.unity
+    guid: 62be730cf8c5e7a4eb4be022f44e18d1
   m_configObjects: {}

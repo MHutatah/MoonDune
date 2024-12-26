@@ -7,44 +7,62 @@ public class UIManager : MonoBehaviour
 {
     public static UIManager Instance;
 
-    [Header("Gravity Fuel UI")]
-    [SerializeField] private Slider gravityFuelSlider;           // Slider representing gravity fuel
-    [SerializeField] private Image gravityFuelFillImage;         // Fill image of the gravity fuel slider
+    #region Inspector Variables
 
-    [Header("Player Laser UI")]
-    [SerializeField] private Slider playerLaserSlider;           // Slider representing player's laser energy
-    [SerializeField] private Image playerLaserFillImage;         // Fill image of the player's laser slider
+    [Header("Player Gravity Fuel UI")]
+    [SerializeField] private Slider gravityFuelSlider_Player;           // Player's gravity fuel slider
+    [SerializeField] private Image gravityFuelFillImage_Player;         // Player's gravity fuel fill image
 
-    [Header("Vehicle Laser UI")]
-    [SerializeField] private Slider vehicleLaserSlider;          // Slider representing vehicle's laser energy
-    [SerializeField] private Image vehicleLaserFillImage;        // Fill image of the vehicle's laser slider
+    [Header("Vehicle Gravity Fuel UI")]
+    [SerializeField] private Slider gravityFuelSlider_Vehicle;          // Vehicle's gravity fuel slider
+    [SerializeField] private Image gravityFuelFillImage_Vehicle;        // Vehicle's gravity fuel fill image
+
+    [Header("Player Laser Energy UI")]
+    [SerializeField] private Slider playerLaserSlider;                  // Player's laser energy slider
+    [SerializeField] private Image playerLaserFillImage;                // Player's laser energy fill image
+
+    [Header("Vehicle Laser Energy UI")]
+    [SerializeField] private Slider vehicleLaserSlider;                 // Vehicle's laser energy slider
+    [SerializeField] private Image vehicleLaserFillImage;               // Vehicle's laser energy fill image
+
+    [Header("Player Oxygen UI")]
+    [SerializeField] private Slider oxygenSlider_Player;                // Player's oxygen slider
+    [SerializeField] private Image oxygenFillImage_Player;              // Player's oxygen fill image
+
+    [Header("Vehicle Oxygen UI")]
+    [SerializeField] private Slider oxygenSlider_Vehicle;               // Vehicle's oxygen slider
+    [SerializeField] private Image oxygenFillImage_Vehicle;             // Vehicle's oxygen fill image
 
     [Header("Oxygen UI")]
-    [SerializeField] private Slider oxygenSlider;                 // Slider representing player's oxygen
-    [SerializeField] private Image oxygenFillImage;               // Fill image of the oxygen slider
-    [SerializeField] private GameObject oxygenWarningMessage;     // UI element indicating low oxygen
+    [SerializeField] private GameObject oxygenWarningMessage;           // UI element indicating low oxygen
 
     [Header("Crystal Count UI")]
-    [SerializeField] private TextMeshProUGUI crystalCountText;    // Text element showing crystal count
+    [SerializeField] private TextMeshProUGUI crystalCountText;          // Text element showing crystal count
 
     [Header("Game State UI")]
-    [SerializeField] private GameObject gameOverScreen;          // UI element for Game Over
-    [SerializeField] private GameObject gameWinScreen;           // UI element for Victory
+    [SerializeField] private GameObject gameOverScreen;                // UI element for Game Over
+    [SerializeField] private GameObject gameWinScreen;                 // UI element for Victory
 
     [Header("Pickup Message UI")]
-    [SerializeField] private TextMeshProUGUI pickupMessageText;  // Text element for pickup messages
-    [SerializeField] private float pickupMessageDuration = 2f;   // Duration the pickup message is displayed
+    [SerializeField] private TextMeshProUGUI pickupMessageText;        // Text element for pickup messages
+    [SerializeField] private float pickupMessageDuration = 2f;         // Duration the pickup message is displayed
 
     [Header("Interaction Prompt UI")]
-    [SerializeField] private TextMeshProUGUI interactionPromptText; // Text element for interaction prompts
+    [SerializeField] private TextMeshProUGUI interactionPromptText;    // Text element for interaction prompts
     [SerializeField] public string enterVehiclePrompt = "Press E to enter vehicle"; // Made public for access
     [SerializeField] public string exitVehiclePrompt = "Press E to exit vehicle";   // Made public for access
 
     [Header("Vehicle HUD UI")]
-    [SerializeField] private GameObject vehicleHUD;              // Reference to the Vehicle HUD UI GameObject
+    [SerializeField] private GameObject vehicleHUD;                    // Reference to the Vehicle HUD UI GameObject
+
+    #endregion
+
+    #region Private Variables
 
     private Coroutine pickupMessageCoroutine;
     private Coroutine interactionPromptCoroutine;
+
+    #endregion
 
     private void Awake()
     {
@@ -70,11 +88,18 @@ public class UIManager : MonoBehaviour
     /// </summary>
     private void InitializeUIElements()
     {
-        // Initialize Gravity Fuel Slider
-        if (gravityFuelSlider != null)
+        // Initialize Player Gravity Fuel Slider
+        if (gravityFuelSlider_Player != null)
         {
-            gravityFuelSlider.maxValue = 100f; // Default max value, to be updated by script
-            gravityFuelSlider.value = gravityFuelSlider.maxValue;
+            gravityFuelSlider_Player.maxValue = 100f; // Default max value, to be updated by script
+            gravityFuelSlider_Player.value = gravityFuelSlider_Player.maxValue;
+        }
+
+        // Initialize Vehicle Gravity Fuel Slider
+        if (gravityFuelSlider_Vehicle != null)
+        {
+            gravityFuelSlider_Vehicle.maxValue = 100f; // Default max value, to be updated by script
+            gravityFuelSlider_Vehicle.value = gravityFuelSlider_Vehicle.maxValue;
         }
 
         // Initialize Player Laser Slider
@@ -91,14 +116,21 @@ public class UIManager : MonoBehaviour
             vehicleLaserSlider.value = vehicleLaserSlider.maxValue;
         }
 
-        // Initialize Oxygen Slider
-        if (oxygenSlider != null)
+        // Initialize Player Oxygen Slider
+        if (oxygenSlider_Player != null)
         {
-            oxygenSlider.maxValue = 100f; // Default max value, to be updated by script
-            oxygenSlider.value = oxygenSlider.maxValue;
+            oxygenSlider_Player.maxValue = 100f; // Default max value, to be updated by script
+            oxygenSlider_Player.value = oxygenSlider_Player.maxValue;
         }
 
-        // Initialize Insufficient Fuel Message
+        // Initialize Vehicle Oxygen Slider
+        if (oxygenSlider_Vehicle != null)
+        {
+            oxygenSlider_Vehicle.maxValue = 100f; // Default max value, to be updated by script
+            oxygenSlider_Vehicle.value = oxygenSlider_Vehicle.maxValue;
+        }
+
+        // Initialize Oxygen Warning Message
         if (oxygenWarningMessage != null)
         {
             oxygenWarningMessage.SetActive(false);
@@ -141,74 +173,92 @@ public class UIManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Updates the gravity fuel bar on the UI.
+    /// Updates both the Player's and Vehicle's gravity fuel bars on the UI.
     /// </summary>
     /// <param name="current">Current gravity fuel.</param>
     /// <param name="max">Maximum gravity fuel.</param>
     public void UpdateGravityFuelBar(float current, float max)
     {
-        if (gravityFuelSlider != null && gravityFuelFillImage != null)
+        // Update Player's Gravity Fuel Slider
+        if (gravityFuelSlider_Player != null)
         {
-            gravityFuelSlider.maxValue = max;
-            gravityFuelSlider.value = current;
+            gravityFuelSlider_Player.maxValue = max;
+            gravityFuelSlider_Player.value = current;
 
-            // Change the fill color based on fuel percentage
-            float fuelPercentage = current / max;
-            gravityFuelFillImage.color = Color.Lerp(Color.red, Color.green, fuelPercentage);
+            // Remove dynamic color change
+            // float fuelPercentage = current / max;
+            // gravityFuelFillImage_Player.color = Color.Lerp(Color.red, Color.green, fuelPercentage);
+        }
+
+        // Update Vehicle's Gravity Fuel Slider
+        if (gravityFuelSlider_Vehicle != null)
+        {
+            gravityFuelSlider_Vehicle.maxValue = max;
+            gravityFuelSlider_Vehicle.value = current;
+
+            // Remove dynamic color change
+            // float fuelPercentage = current / max;
+            // gravityFuelFillImage_Vehicle.color = Color.Lerp(Color.red, Color.green, fuelPercentage);
         }
     }
 
     /// <summary>
-    /// Updates the player's laser energy bar on the UI.
+    /// Updates both the Player's and Vehicle's laser energy bars on the UI.
     /// </summary>
     /// <param name="current">Current laser energy.</param>
     /// <param name="max">Maximum laser energy.</param>
-    public void UpdatePlayerLaserBar(float current, float max)
+    public void UpdateLaserEnergyBar(float current, float max)
     {
-        if (playerLaserSlider != null && playerLaserFillImage != null)
+        // Update Player's Laser Energy Slider
+        if (playerLaserSlider != null)
         {
             playerLaserSlider.maxValue = max;
             playerLaserSlider.value = current;
 
-            // Change the fill color based on energy percentage
-            float energyPercentage = current / max;
-            playerLaserFillImage.color = Color.Lerp(Color.red, Color.yellow, energyPercentage);
+            // Remove dynamic color change
+            // float energyPercentage = current / max;
+            // playerLaserFillImage.color = Color.Lerp(Color.red, Color.yellow, energyPercentage);
         }
-    }
 
-    /// <summary>
-    /// Updates the vehicle's laser energy bar on the UI.
-    /// </summary>
-    /// <param name="current">Current laser energy.</param>
-    /// <param name="max">Maximum laser energy.</param>
-    public void UpdateVehicleLaserBar(float current, float max)
-    {
-        if (vehicleLaserSlider != null && vehicleLaserFillImage != null)
+        // Update Vehicle's Laser Energy Slider
+        if (vehicleLaserSlider != null)
         {
             vehicleLaserSlider.maxValue = max;
             vehicleLaserSlider.value = current;
 
-            // Change the fill color based on energy percentage
-            float energyPercentage = current / max;
-            vehicleLaserFillImage.color = Color.Lerp(Color.red, Color.yellow, energyPercentage);
+            // Remove dynamic color change
+            // float energyPercentage = current / max;
+            // vehicleLaserFillImage.color = Color.Lerp(Color.red, Color.yellow, energyPercentage);
         }
     }
 
     /// <summary>
-    /// Updates the oxygen bar on the UI.
+    /// Updates both the Player's and Vehicle's oxygen bars on the UI.
     /// </summary>
     /// <param name="current">Current oxygen level.</param>
     /// <param name="max">Maximum oxygen level.</param>
     public void UpdateOxygenBar(float current, float max)
     {
-        if (oxygenSlider != null && oxygenFillImage != null)
+        // Update Player's Oxygen Slider
+        if (oxygenSlider_Player != null)
         {
-            oxygenSlider.maxValue = max;
-            oxygenSlider.value = current;
+            oxygenSlider_Player.maxValue = max;
+            oxygenSlider_Player.value = current;
 
-            // Change the fill color based on oxygen percentage
-            float oxygenPercentage = current / max;
-            oxygenFillImage.color = Color.Lerp(Color.green, Color.red, 1f - oxygenPercentage);
+            // Remove dynamic color change
+            // float oxygenPercentage = current / max;
+            // oxygenFillImage_Player.color = Color.Lerp(Color.green, Color.red, 1f - oxygenPercentage);
+        }
+
+        // Update Vehicle's Oxygen Slider
+        if (oxygenSlider_Vehicle != null)
+        {
+            oxygenSlider_Vehicle.maxValue = max;
+            oxygenSlider_Vehicle.value = current;
+
+            // Remove dynamic color change
+            // float oxygenPercentage = current / max;
+            // oxygenFillImage_Vehicle.color = Color.Lerp(Color.green, Color.red, 1f - oxygenPercentage);
         }
     }
 
@@ -363,5 +413,3 @@ public class UIManager : MonoBehaviour
         }
     }
 }
-
-

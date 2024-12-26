@@ -13,6 +13,7 @@ public class VehicleInteraction : MonoBehaviour
     [SerializeField] private GravityFieldGenerator gravityFieldGenerator;  // Reference to the GravityFieldGenerator script
     [SerializeField] private Transform exitPoint;                          // Reference to the exit point Transform
     [SerializeField] private Canvas interactionCanvas;                     // UI Canvas for interaction prompts
+    [SerializeField] private CameraManager cameraManager;           // Assign in Inspector
 
     #endregion
 
@@ -28,6 +29,14 @@ public class VehicleInteraction : MonoBehaviour
     private void Update()
     {
         HandleInteractionInput();
+        if (isPlayerInside)
+        {
+            cameraManager.SwitchToVehicleCamera();
+        }
+        else
+        {
+            cameraManager.SwitchToPlayerCamera();
+        }
     }
 
     private void OnTriggerEnter(Collider other)

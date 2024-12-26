@@ -121,10 +121,10 @@ public class VehicleLaser : MonoBehaviour
         currentLaserRange = Mathf.Clamp(currentLaserRange, 0f, laserRange);
 
         // Update UI
-        UIManager.Instance?.UpdateVehicleLaserBar(currentLaserEnergy, maxLaserEnergy);
+        UIManager.Instance?.UpdateLaserEnergyBar(currentLaserEnergy, maxLaserEnergy);
     }
 
-    /// <summary>ss
+    /// <summary>
     /// Renders the laser beam in the current firing direction.
     /// </summary>
     /// <param name="currentDirection">The current direction of the laser.</param>
@@ -181,7 +181,7 @@ public class VehicleLaser : MonoBehaviour
         {
             currentLaserEnergy += rechargeRate * Time.deltaTime;
             currentLaserEnergy = Mathf.Clamp(currentLaserEnergy, 0f, maxLaserEnergy);
-            UIManager.Instance?.UpdateVehicleLaserBar(currentLaserEnergy, maxLaserEnergy);
+            UIManager.Instance?.UpdateLaserEnergyBar(currentLaserEnergy, maxLaserEnergy);
         }
     }
 
@@ -236,7 +236,7 @@ public class VehicleLaser : MonoBehaviour
     public void ReplenishLaserEnergy(float amount)
     {
         currentLaserEnergy = Mathf.Min(currentLaserEnergy + amount, maxLaserEnergy);
-        UIManager.Instance?.UpdateVehicleLaserBar(currentLaserEnergy, maxLaserEnergy);
+        UIManager.Instance?.UpdateLaserEnergyBar(currentLaserEnergy, maxLaserEnergy);
         Debug.Log($"Vehicle Laser Energy Replenished by: {amount}");
     }
 
